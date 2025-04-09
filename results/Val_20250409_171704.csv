@@ -1,0 +1,8 @@
+trial,trialTime,attackingPiece,attackingPosition,attackedPieces,responseTime,success,responsePosition
+0,0.012,wK,h3,h4;g3,0.899,0,f5
+1,2.122,wN,d5,c7;f4,0.775,0,d7
+2,4.108,bK,e8,d7;d8,0.828,1,d7
+3,6.145,wK,d1,e2;d2,0.939,0,d7
+4,8.294,wR,b4,b6,1.76,1,b6
+5,11.266,wP,d5,e6,4.798,0,c5
+6,17.271,wP,g4,h5,0.426,0,d7

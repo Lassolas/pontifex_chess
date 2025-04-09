@@ -1,0 +1,294 @@
+:root {
+    --light-square: #f0d9b5;
+    --dark-square: #b58863;
+    --highlight: rgba(0, 255, 0, 0.3);
+    --button-color: #4a4a4a;
+    --button-hover: #5a5a5a;
+    --button-selected: #6a6a6a;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+#app {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.screen {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    max-width: 800px;
+    width: 90%;
+    text-align: center;
+}
+
+.hidden {
+    display: none;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.input-container {
+    margin: 2rem 0;
+}
+
+input[type="text"] {
+    padding: 0.5rem;
+    font-size: 1rem;
+    margin: 1rem 0;
+    width: 200px;
+}
+
+button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    cursor: pointer;
+    border-radius: 5px;
+    margin: 0.5rem;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+.difficulty-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.difficulty-btn {
+    background-color: #2196F3;
+}
+
+.difficulty-btn.selected {
+    background-color: #0b7dda;
+}
+
+.time-section {
+    margin: 2rem 0;
+}
+
+input[type="range"] {
+    width: 200px;
+    margin: 0 1rem;
+}
+
+#chessboard {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    width: 500px;
+    height: 500px;
+    margin: 2rem auto;
+    border: 2px solid #333;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Media query for mobile devices */
+@media (max-width: 768px) {
+    #chessboard {
+        width: 95vw; /* 80% of the viewport width */
+        height: 95vw; /* Maintain square shape */
+        max-width: 600px; /* Maximum width */
+        max-height: 600px; /* Maximum height */
+    }
+
+    .piece {
+        font-size: 80%; /* Adjust piece size for smaller screens */
+    }
+
+    .controls-container {
+        flex-direction: column; /* Stack controls vertically */
+    }
+
+    .time-selector {
+        margin-bottom: 10px; /* Add space between controls */
+    }
+}
+
+.square {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.square.white {
+    background-color: #f0d9b5;
+}
+
+.square.black {
+    background-color: #b58863;
+}
+
+.square.clicked {
+    background-color: #ffeb3b;
+}
+
+.piece {
+    width: 90%;
+    height: 90%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.piece svg {
+    width: 100%;
+    height: 100%;
+}
+
+.attacking-piece {
+    width: 150px;
+    height: 150px;
+    margin: 1rem auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+    border: 2px solid #333;
+    border-radius: 5px;
+}
+
+.attacking-piece svg {
+    width: 80%;
+    height: 80%;
+}
+
+.instruction-text {
+    font-size: 1.2rem;
+    margin: 1rem 0;
+}
+
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.results-summary {
+    text-align: left;
+    margin: 2rem 0;
+}
+
+.results-summary h2 {
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.results-summary p {
+    margin: 0.5rem 0;
+    font-size: 1.1rem;
+}
+
+#attacking-piece-container {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    z-index: 10;
+}
+
+#attacking-piece {
+    width: 60px;
+    height: 60px;
+    background-color: white;
+    border: 2px solid black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 40px;
+}
+
+#instruction {
+    font-size: 16px;
+    text-align: center;
+}
+
+#timer {
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+#countdown {
+    font-size: 72px;
+    /*color: #333;*/
+    color: #f0f0f0;
+}
+
+#download-results {
+    margin-top: 20px;
+}
+
+#game-screen {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.coordinate-label {
+    position: absolute;
+    font-size: 16px;
+    color: #333;
+    font-weight: bold;
+}
+
+.rank-label {
+    left: 5px;  /* Position rank labels on the left */
+    width: 15px;
+    height: 75px;  /* Match square height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.file-label {
+    bottom: 5px;  /* Position file labels at the bottom */
+    width: 75px;  /* Match square width */
+    height: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#chessboard-container {
+    position: relative;
+    padding: 25px;  /* Add padding to make room for labels */
+    width: 600px;
+    height: 600px;
+} 
