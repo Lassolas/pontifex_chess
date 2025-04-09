@@ -19,7 +19,18 @@ SHEET_ID = "1M2TjhCmjLX6w3POBNoTLlC1QXOeZxXIPaKjTPrdECeo"  # Replace with your e
 def get_sheets_service():
     try:
         # Load credentials from the environment variable
-        credentials_info = json.loads(os.getenv("GOOGLE_SHEET_CREDENTIALS"))
+        google_credentials = os.getenv('GOOGLE_SHEET_CREDENTIALS')
+
+        if google_credentials:
+            print("Google Credentials loaded successfully.")
+            try:
+                credentials_info = json.loads(google_credentials)
+                print("Credentials are valid.")
+            except json.JSONDecodeError as e:
+                print(f"Error decoding JSON: {e}")
+        else:
+            print("No credentials found!")
+
         creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
 
         # Log successful credential loading
