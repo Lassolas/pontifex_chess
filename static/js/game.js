@@ -142,7 +142,7 @@ class GameUI {
         this.remainingTime = this.game.duration;
         this.updateTimer();
         this.startTimer();
-        this.startTime = Date.now(); // set up the start time of the experience
+        this.startTime = Date.now(); // Set up the start time of the experience
         this.startNewTrial();
     }
 
@@ -290,7 +290,10 @@ class GameUI {
                 },
                 body: JSON.stringify({
                     patientName: this.patientName,
-                    trialData: this.game.trialData
+                    trialData: this.game.trialData,
+                    difficulty: this.game.difficulty,
+                    testDuration: this.game.duration,
+                    boardDisplayTime: this.game.hideTime
                 })
             });
 
@@ -307,6 +310,9 @@ class GameUI {
 
     downloadResults() {
         const csvContent = [
+            ['Difficulty', this.game.difficulty],  // Header for Difficulty
+            ['Test Duration', this.game.duration],  // Header for Test Duration
+            ['Board Display Time', this.game.hideTime],  // Header for Board Display Time
             ['Trial', 'Trial Time', 'Attacking Piece', 'Attacking Position', 'Attacked Pieces', 'Response Time', 'Success', 'Response Position'],
             ...this.game.trialData.map(trial => [
                 trial.trial,
