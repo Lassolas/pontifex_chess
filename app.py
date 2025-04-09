@@ -21,6 +21,9 @@ def get_sheets_service():
         # Load credentials from the environment variable
         google_credentials = os.getenv('GOOGLE_SHEET_CREDENTIALS')
 
+        # Print the credentials for debugging
+        print("Google Credentials:", google_credentials)  # Log the credentials
+
         if google_credentials:
             print("Google Credentials loaded successfully.")
             try:
@@ -28,8 +31,10 @@ def get_sheets_service():
                 print("Credentials are valid.")
             except json.JSONDecodeError as e:
                 print(f"Error decoding JSON: {e}")
+                raise  # Re-raise the exception to handle it later
         else:
             print("No credentials found!")
+            raise ValueError("GOOGLE_SHEET_CREDENTIALS is not set.")
 
         creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
 
