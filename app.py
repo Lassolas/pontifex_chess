@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, jsonify
 import os
 from datetime import datetime
-from google.oauth2.service_account import Credentials
+import json
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 app = Flask(__name__)
@@ -9,9 +10,11 @@ app = Flask(__name__)
 # Google Sheets API setup
 SHEET_ID = "1M2TjhCmjLX6w3POBNoTLlC1QXOeZxXIPaKjTPrdECeo"  # Replace with your existing sheet ID
 
-# Set up Google Sheets API client
+# Function to get Google Sheets service
 def get_sheets_service():
-    creds = Credentials.from_service_account_file('credentials/credentials.json', scopes=["https://www.googleapis.com/auth/spreadsheets"])
+    # Load credentials from the environment variable
+    credentials_info = json.loads(os.environ['GOOGLE_SHEET_CREDENTIALS'])
+    creds = service_account.Credentials.from_service_account_info(credentials_info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
     service = build("sheets", "v4", credentials=creds)
     return service.spreadsheets()
 
@@ -26,9 +29,15 @@ def submit_results():
         patient_name = data.get('patientName', 'unknown')
         trial_data = data.get('trialData', [])
         
+        # Extract configuration settings
+        difficulty = data.get('difficulty', 'N/A')
+        test_duration = data.get('testDuration', 'N/A')
+        board_display_time = data.get('boardDisplayTime', 'N/A')
+
         # Log the data being submitted
         print(f"Submitting results for patient: {patient_name}")
         print("Trial Data:", trial_data)
+        print(f"Configuration - Difficulty: {difficulty}, Test Duration: {test_duration}, Board Display Time: {board_display_time}")
 
         # Create a new sheet with the patient's name
         service = get_sheets_service()
@@ -52,7 +61,7 @@ def submit_results():
 
         # Prepare data to be written to the new sheet
         sheet_data = [
-            ['Trial', 'Trial Time', 'Attacking Piece', 'Attacking Position', 'Attacked Pieces', 'Response Time', 'Success', 'Response Position']
+            ['Trial', 'Trial Time', 'Attacking Piece', 'Attacking Position', 'Attacked Pieces', 'Response Time', 'Success', 'Response Position', 'Difficulty', 'Test Duration', 'Board Display Time']
         ]
         for trial in trial_data:
             sheet_data.append([
@@ -63,7 +72,10 @@ def submit_results():
                 trial['attackedPieces'],
                 trial['responseTime'],
                 trial['success'],
-                trial['responsePosition']
+                trial['responsePosition'],
+                difficulty,  # Add difficulty
+                test_duration,  # Add test duration
+                board_display_time  # Add board display time
             ])
         
         # Log the data to be written to the Google Sheet
