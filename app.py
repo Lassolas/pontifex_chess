@@ -1,14 +1,19 @@
 from flask import Flask, render_template, request, jsonify
 import os
-import csv
 from datetime import datetime
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
 app = Flask(__name__)
 
-# Configure results directory
-RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results')
-if not os.path.exists(RESULTS_DIR):
-    os.makedirs(RESULTS_DIR)
+# Google Sheets API setup
+SHEET_ID = "1M2TjhCmjLX6w3POBNoTLlC1QXOeZxXIPaKjTPrdECeo"  # Replace with your existing sheet ID
+
+# Set up Google Sheets API client
+def get_sheets_service():
+    creds = Credentials.from_service_account_file('credentials/credentials.json', scopes=["https://www.googleapis.com/auth/spreadsheets"])
+    service = build("sheets", "v4", credentials=creds)
+    return service.spreadsheets()
 
 @app.route('/')
 def index():
@@ -21,27 +26,65 @@ def submit_results():
         patient_name = data.get('patientName', 'unknown')
         trial_data = data.get('trialData', [])
         
-        # Create filename with timestamp
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{patient_name}_{timestamp}.csv"
-        filepath = os.path.join(RESULTS_DIR, filename)
+        # Log the data being submitted
+        print(f"Submitting results for patient: {patient_name}")
+        print("Trial Data:", trial_data)
+
+        # Create a new sheet with the patient's name
+        service = get_sheets_service()
+        new_sheet_name = patient_name  # Use patient name as the sheet name
         
-        # Write data to CSV
-        with open(filepath, 'w', newline='') as csvfile:
-            fieldnames = ['trial', 'trialTime', 'attackingPiece', 'attackingPosition', 
-                         'attackedPieces', 'responseTime', 'success', 'responsePosition']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            
-            writer.writeheader()
-            for trial in trial_data:
-                writer.writerow(trial)
+        # Check if the sheet already exists, and if not, create it
+        spreadsheet = service.get(spreadsheetId=SHEET_ID).execute()
+        sheet_names = [s['properties']['title'] for s in spreadsheet['sheets']]
         
-        return jsonify({'status': 'success', 'message': f'Results saved to {filename}'})
+        if new_sheet_name not in sheet_names:
+            # Create a new sheet with the patient name
+            service.batchUpdate(spreadsheetId=SHEET_ID, body={
+                "requests": [{
+                    "addSheet": {
+                        "properties": {
+                            "title": new_sheet_name
+                        }
+                    }
+                }]
+            }).execute()
+
+        # Prepare data to be written to the new sheet
+        sheet_data = [
+            ['Trial', 'Trial Time', 'Attacking Piece', 'Attacking Position', 'Attacked Pieces', 'Response Time', 'Success', 'Response Position']
+        ]
+        for trial in trial_data:
+            sheet_data.append([
+                trial['trial'],
+                trial['trialTime'],
+                trial['attackingPiece'],
+                trial['attackingPosition'],
+                trial['attackedPieces'],
+                trial['responseTime'],
+                trial['success'],
+                trial['responsePosition']
+            ])
+        
+        # Log the data to be written to the Google Sheet
+        print("Data to be written to Google Sheet:", sheet_data)
+
+        # Append data to the newly created sheet
+        range_name = f"{new_sheet_name}!A1"  # Insert data starting from the first cell of the new sheet
+        result = service.values().append(
+            spreadsheetId=SHEET_ID,
+            range=range_name,
+            valueInputOption="RAW",
+            body={"values": sheet_data}
+        ).execute()
+
+        # Log the result from the Google Sheets API
+        print("Google Sheets API response:", result)
+
+        return jsonify({'status': 'success', 'message': f'Results saved to sheet {new_sheet_name}'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
-    # Use port 5001 to avoid conflict with AirPlay on macOS
     port = int(os.environ.get('PORT', 5000))
-    # Run the app on 0.0.0.0 to accept external connections
-    app.run(host='0.0.0.0', port=port, debug=False) 
+    app.run(host='0.0.0.0', port=port, debug=False)
