@@ -73,8 +73,22 @@ button {
 }
 
 button:hover {
-    background-color: #45a049;
+    background-color: #f1007480;
 }
+
+.duration-btn {
+    background-color: #4CAF50; /* Default color */
+    color: white; /* Text color */
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.duration-btn.selected {
+    background-color: #f10074; /* Change to yellow when selected */
+    color: white; /* Optional: Change text color for better contrast */
+} 
 
 .difficulty-buttons {
     display: flex;
@@ -88,7 +102,7 @@ button:hover {
 }
 
 .difficulty-btn.selected {
-    background-color: #0a6da8;
+    background-color: #f10074;
 }
 
 .time-section {
@@ -291,4 +305,4 @@ input[type="range"] {
     padding: 25px;  /* Add padding to make room for labels */
     width: 600px;
     height: 600px;
-} 
+}
