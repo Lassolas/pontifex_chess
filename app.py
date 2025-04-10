@@ -55,6 +55,12 @@ def get_sheets_service():
 def index():
     return render_template('index.html')
 
+#health check
+@app.route('/health')
+def health():
+    return "OK", 200
+
+
 @app.route('/submit_results', methods=['POST'])
 def submit_results():
     try:
