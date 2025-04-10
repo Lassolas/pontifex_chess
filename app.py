@@ -60,6 +60,10 @@ def index():
 def health():
     return "OK", 200
 
+#add a ping return
+@app.route("/ping")
+def ping():
+    return "pong", 200
 
 @app.route('/submit_results', methods=['POST'])
 def submit_results():
