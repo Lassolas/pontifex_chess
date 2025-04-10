@@ -107,8 +107,15 @@ def submit_results():
             }).execute()
             print(f"New sheet created: {new_sheet_name}")
 
+        # Get the current date and time
+        now = datetime.now()
+        date_str = now.strftime("%y-%d")  # Format: YY-DD
+        time_str = now.strftime("%H-%M")  # Format: hh-mm
+
         # Prepare data to be written to the new sheet
         sheet_data = [
+            [f"Date: {date_str}"],  # Date row
+            [f"Time: {time_str}"],  # Time row
             ['Difficulty', difficulty],  # Header for Difficulty
             ['Test Duration', test_duration],  # Header for Test Duration
             ['Board Display Time', board_display_time],  # Header for Board Display Time

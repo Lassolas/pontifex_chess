@@ -190,7 +190,8 @@ class ChessGame {
         };
         
         // Step 1: Choose attacking piece and color
-        const attackingColor = Math.random() < 0.5 ? 'w' : 'b';
+        //const attackingColor = Math.random() < 0.5 ? 'w' : 'b';
+        const attackingColor = 'w'; // always white for now
         const pieceTypes = ['P', 'N', 'B', 'R', 'Q', 'K'];  // All possible piece types
         const attackingType = pieceTypes[Math.floor(Math.random() * pieceTypes.length)];
         const attackingPiece = attackingColor + attackingType;
