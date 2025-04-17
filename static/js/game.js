@@ -12,7 +12,35 @@ class GameUI {
         this.trialStartTime = null;  // Track the start time of the trial
         this.startTime = null;  // Store the start time of the experience
         
-        this.initializeElements();
+        this.screens = {
+            'name-input': document.getElementById('name-input-screen'),
+            'intro': document.getElementById('intro-screen'),
+            'countdown': document.getElementById('countdown-screen'),
+            'game': document.getElementById('game-screen'),
+            'results': document.getElementById('results-screen')
+        };
+
+        this.nameInput = document.getElementById('patient-name');
+        this.startButton = document.getElementById('start-button');
+        this.beginButton = document.getElementById('begin-button');
+        this.downloadButton = document.getElementById('download-button');
+        this.restartButton = document.getElementById('restart-button');
+
+        this.difficultyButtons = document.querySelectorAll('.difficulty-btn');
+        this.durationButtons = document.querySelectorAll('.duration-btn');
+        this.timeSlider = document.getElementById('time-slider');
+        this.timeValue = document.getElementById('time-value');
+
+        this.countdownText = document.getElementById('countdown-text');
+
+        this.chessboard = document.getElementById('chessboard');
+        this.attackingPieceContainer = document.getElementById('attacking-piece');
+        this.instructionText = document.getElementById('instruction-text');
+        this.timerDisplay = document.getElementById('timer');
+        this.trialCount = document.getElementById('trial-count');
+
+        this.resultsSummary = document.getElementById('results-summary');
+
         this.initializeEventListeners();
         this.loadImages();
     }
@@ -30,42 +58,6 @@ class GameUI {
                 console.error(`Error loading image for ${piece}:`, error);
             }
         }
-    }
-
-    initializeElements() {
-        // Screens
-        this.screens = {
-            'name-input': document.getElementById('name-input-screen'),
-            'intro': document.getElementById('intro-screen'),
-            'countdown': document.getElementById('countdown-screen'),
-            'game': document.getElementById('game-screen'),
-            'results': document.getElementById('results-screen')
-        };
-
-        // Name input elements
-        this.nameInput = document.getElementById('patient-name');
-        this.startButton = document.getElementById('start-button');
-
-        // Intro screen elements
-        this.difficultyButtons = document.querySelectorAll('.difficulty-btn');
-        this.durationButtons = document.querySelectorAll('.duration-btn');
-        this.timeSlider = document.getElementById('time-slider');
-        this.timeValue = document.getElementById('time-value');
-        this.beginButton = document.getElementById('begin-button');
-
-        // Countdown elements
-        this.countdownText = document.getElementById('countdown-text');
-
-        // Game screen elements
-        this.chessboard = document.getElementById('chessboard');
-        this.attackingPieceContainer = document.getElementById('attacking-piece');
-        this.instructionText = document.getElementById('instruction-text');
-        this.timerDisplay = document.getElementById('timer');
-        this.trialCount = document.getElementById('trial-count');
-
-        // Results screen elements
-        this.resultsSummary = document.getElementById('results-summary');
-        this.downloadButton = document.getElementById('download-button');
     }
 
     initializeEventListeners() {
@@ -291,8 +283,30 @@ class GameUI {
             <p>IES: ${IES} seconds</p>
         `;
 
+        // Store IES for leaderboard comparison
+        this.game.IES = IES;
+
         // Automatically submit results to server
         this.submitResults(IES);
+        
+    }
+
+    async fetchLeaderboard() {
+        const leaderboardLoading = document.getElementById('leaderboard-loading');
+    
+        try {
+            const response = await fetch('/get_leaderboard');
+            const data = await response.json();
+            
+            if (data.success && data.leaderboard.length > 0) {
+                this.displayLeaderboard(data.leaderboard);
+            } else {
+                leaderboardLoading.textContent = 'No leaderboard data available.';
+            }
+        } catch (error) {
+            console.error('Error fetching leaderboard:', error);
+            leaderboardLoading.textContent = 'Failed to load leaderboard.';
+        }
     }
 
     async submitResults(IES) {
@@ -312,17 +326,57 @@ class GameUI {
                 })
             });
 
-            const result = await response.json();
-            if (result.status === 'success') {
-                console.log('Results saved successfully:', result.message);
+            const data = await response.json();
+            console.log('Results submitted:', data);
+            
+            // If the response includes leaderboard data, display it
+            if (data.leaderboard) {
+                this.displayLeaderboard(data.leaderboard);
             } else {
-                console.error('Error saving results:', result.message);
+                // Fallback to fetching leaderboard separately if not included
+                this.fetchLeaderboard();
             }
         } catch (error) {
             console.error('Error submitting results:', error);
         }
     }
-
+    // New function to display leaderboard data
+    displayLeaderboard(leaderboardData) {
+        const leaderboardLoading = document.getElementById('leaderboard-loading');
+        const leaderboardTable = document.getElementById('leaderboard-table');
+        const leaderboardBody = document.getElementById('leaderboard-body');
+        
+        if (leaderboardData && leaderboardData.length > 0) {
+            // Clear previous entries
+            leaderboardBody.innerHTML = '';
+            
+            // Add each leaderboard entry
+            leaderboardData.forEach(entry => {
+                const row = document.createElement('tr');
+                
+                // Highlight current user
+                if (entry.name === this.patientName) {
+                    row.classList.add('current-user');
+                }
+                
+                row.innerHTML = `
+                    <td>${entry.rank}</td>
+                    <td>${entry.name}</td>
+                    <td>${entry.ies}</td>
+                    <td>${entry.difficulty}</td>
+                    <td>${entry.boardTime}s</td>
+                `;
+                
+                leaderboardBody.appendChild(row);
+            });
+            
+            // Show the table and hide loading message
+            leaderboardLoading.style.display = 'none';
+            leaderboardTable.style.display = 'table';
+        } else {
+            leaderboardLoading.textContent = 'No leaderboard data available.';
+        }
+    }
     downloadResults() {
         const csvContent = [
             ['Difficulty', this.game.difficulty],  // Header for Difficulty

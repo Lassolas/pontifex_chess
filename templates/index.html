@@ -70,7 +70,30 @@
     <div id="results-screen" class="screen" style="display: none;">
         <h1>Test Complete</h1>
         <div id="results-summary" class="results-summary"></div>
+        
+        <!-- Leaderboard Section -->
+        <div id="leaderboard-container" class="leaderboard-container">
+            <h2>Leaderboard</h2>
+            <div id="leaderboard-loading">Loading leaderboard...</div>
+            <table id="leaderboard-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Name</th>
+                        <th>IES (s)</th>
+                        <th>Difficulty</th>
+                        <th>Board Time</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                    <!-- Leaderboard entries will be added here dynamically -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="results-buttons">
         <button id="download-button">Download Results</button>
+    </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/chess.js') }}"></script>

@@ -117,6 +117,43 @@ def health():
 def ping():
     return "pong", 200
 
+@app.route('/get_leaderboard')
+def get_leaderboard():
+    try:
+        # Create service
+        service = get_sheets_service()
+        
+        # Get leaderboard data
+        leaderboard_sheet_name = "leaderboard"
+        leaderboard_data = service.values().get(
+            spreadsheetId=SHEET_ID,
+            range=f"{leaderboard_sheet_name}!A1:D1000"
+        ).execute().get("values", [])
+        
+        # Format data for frontend
+        if len(leaderboard_data) > 0:
+            headers = leaderboard_data[0]
+            entries = leaderboard_data[1:11] if len(leaderboard_data) > 11 else leaderboard_data[1:]
+            
+            formatted_data = []
+            for i, entry in enumerate(entries):
+                if len(entry) >= 4:  # Ensure entry has all required fields
+                    formatted_data.append({
+                        "rank": i + 1,
+                        "name": entry[0],
+                        "ies": entry[1],
+                        "difficulty": entry[2],
+                        "boardTime": entry[3]
+                    })
+            
+            return jsonify({"success": True, "leaderboard": formatted_data})
+        else:
+            return jsonify({"success": False, "message": "No leaderboard data found"})
+    
+    except Exception as e:
+        print(f"Error fetching leaderboard: {str(e)}")
+        return jsonify({"success": False, "message": "Error fetching leaderboard data"})
+
 @app.route('/submit_results', methods=['POST'])
 def submit_results():
     try:
@@ -200,10 +237,38 @@ def submit_results():
 
         # Log the result from the Google Sheets API
         print("Google Sheets API response:", result)
-        # ✅ Trigger leaderboard update
+        # Trigger leaderboard update
         update_leaderboard(service)
 
-        return jsonify({'status': 'success', 'message': f'Results saved to sheet {new_sheet_name}'})
+        # Get updated leaderboard data to send back to the client
+        leaderboard_data = []
+        try:
+            leaderboard_sheet_name = "leaderboard"
+            values = service.values().get(
+                spreadsheetId=SHEET_ID,
+                range=f"{leaderboard_sheet_name}!A1:D1000"
+            ).execute().get("values", [])
+            
+            if len(values) > 1:  # Header + at least one entry
+                entries = values[1:11] if len(values) > 11 else values[1:]
+                
+                for i, entry in enumerate(entries):
+                    if len(entry) >= 4:
+                        leaderboard_data.append({
+                            "rank": i + 1,
+                            "name": entry[0],
+                            "ies": entry[1],
+                            "difficulty": entry[2],
+                            "boardTime": entry[3]
+                        })
+        except Exception as e:
+            print(f"Error getting leaderboard data: {e}")
+        
+        return jsonify({
+            'status': 'success', 
+            'message': f'Results saved to sheet {new_sheet_name}',
+            'leaderboard': leaderboard_data
+        })
     except Exception as e:
         print(f"Error occurred: {str(e)}")  # Log the error message
         return jsonify({'status': 'error', 'message': str(e)}), 500
