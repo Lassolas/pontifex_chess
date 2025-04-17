@@ -1,0 +1,5 @@
+TODO LIST
+
+18/04/2025
+- Add a focus performance score. (constant focus vs decline) 
+to motivate people to focus more despite being tired.
