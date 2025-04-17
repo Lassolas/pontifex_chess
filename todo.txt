@@ -2,5 +2,6 @@ TODO LIST
 
 18/04/2025
 - update the training phase to give color feedback.
+- Mix the hard trial with simple ones to get a contrastive anlaysis, do performance decrease harder in hard task than easy ?  
 - Add a focus performance score. (constant focus vs decline) 
 to motivate people to focus more despite being tired.
