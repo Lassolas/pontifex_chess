@@ -5,6 +5,7 @@ import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
+import csv
 
 
 app = Flask(__name__)
@@ -71,12 +72,11 @@ def submit_results():
         data = request.get_json()
         patient_name = data.get('patientName', 'unknown')
         trial_data = data.get('trialData', [])
-        
-        # Extract configuration settings
         difficulty = data.get('difficulty', 'N/A')
         test_duration = data.get('testDuration', 'N/A')
         board_display_time = data.get('boardDisplayTime', 'N/A')
-
+        IES = data.get('IES')  # Get the IES score
+        
         # Log the data being submitted
         print(f"Submitting results for patient: {patient_name}")
         print("Trial Data:", trial_data)
@@ -90,7 +90,7 @@ def submit_results():
         spreadsheet = service.get(spreadsheetId=SHEET_ID).execute()
 
         # Log the spreadsheet metadata to confirm access
-        print("Spreadsheet metadata retrieved successfully:", spreadsheet)
+        #print("Spreadsheet metadata retrieved successfully:", spreadsheet)
 
         sheet_names = [s['properties']['title'] for s in spreadsheet['sheets']]
 
@@ -119,6 +119,7 @@ def submit_results():
             ['Difficulty', difficulty],  # Header for Difficulty
             ['Test Duration', test_duration],  # Header for Test Duration
             ['Board Display Time', board_display_time],  # Header for Board Display Time
+            ['IES', IES],  # Header for IES
             ['Trial', 'Trial Time', 'Attacking Piece', 'Attacking Position', 'Attacked Pieces', 'Response Time', 'Success', 'Response Position']  # Main headers
         ]
         
@@ -148,6 +149,17 @@ def submit_results():
 
         # Log the result from the Google Sheets API
         print("Google Sheets API response:", result)
+
+        # Here you would add your logic to save to Google Sheets or CSV
+        # For example, saving to a CSV file
+        with open('results.csv', mode='a', newline='') as file:
+            writer = csv.writer(file)
+            # Write headers if the file is empty
+            if file.tell() == 0:
+                writer.writerow(['Patient Name', 'Difficulty', 'Test Duration', 'Board Display Time', 'IES', 'Trial', 'Trial Time', 'Attacking Piece', 'Attacking Position', 'Attacked Pieces', 'Response Time', 'Success', 'Response Position'])
+            
+            for trial in trial_data:
+                writer.writerow([patient_name, difficulty, test_duration, board_display_time, IES, trial['trial'], trial['trialTime'], trial['attackingPiece'], trial['attackingPosition'], trial['attackedPieces'], trial['responseTime'], trial['success'], trial['responsePosition']])
 
         return jsonify({'status': 'success', 'message': f'Results saved to sheet {new_sheet_name}'})
     except Exception as e:

@@ -268,20 +268,29 @@ class GameUI {
         const totalTrials = this.game.trialData.length;
         const successfulTrials = this.game.trialData.filter(trial => trial.success === 1).length;
         const successRate = ((successfulTrials / totalTrials) * 100).toFixed(1);
-        const averageRT = (this.game.trialData.reduce((sum, trial) => sum + trial.responseTime, 0) / totalTrials).toFixed(2);
         
+        // Calculate average response time for successful trials
+        const averageRT = (this.game.trialData
+            .filter(trial => trial.success === 1)
+            .reduce((sum, trial) => sum + trial.responseTime, 0) / successfulTrials).toFixed(2);
+        
+        // Calculate IES
+        const accuracy = successfulTrials / totalTrials || 1; // Avoid division by zero
+        const IES = (averageRT / accuracy).toFixed(2); // Compute IES
+
         this.resultsSummary.innerHTML = `
             <p>Total Trials: ${totalTrials}</p>
             <p>Successful Trials: ${successfulTrials}</p>
             <p>Success Rate: ${successRate}%</p>
             <p>Average Response Time: ${averageRT}s</p>
+            <p>IES: ${IES} seconds</p>
         `;
 
         // Automatically submit results to server
-        this.submitResults();
+        this.submitResults(IES);
     }
 
-    async submitResults() {
+    async submitResults(IES) {
         try {
             const response = await fetch('/submit_results', {
                 method: 'POST',
@@ -293,7 +302,8 @@ class GameUI {
                     trialData: this.game.trialData,
                     difficulty: this.game.difficulty,
                     testDuration: this.game.duration,
-                    boardDisplayTime: this.game.hideTime
+                    boardDisplayTime: this.game.hideTime,
+                    IES: IES
                 })
             });
 
@@ -313,6 +323,7 @@ class GameUI {
             ['Difficulty', this.game.difficulty],  // Header for Difficulty
             ['Test Duration', this.game.duration],  // Header for Test Duration
             ['Board Display Time', this.game.hideTime],  // Header for Board Display Time
+            ['IES', this.game.IES],  // Header for IES
             ['Trial', 'Trial Time', 'Attacking Piece', 'Attacking Position', 'Attacked Pieces', 'Response Time', 'Success', 'Response Position'],
             ...this.game.trialData.map(trial => [
                 trial.trial,
