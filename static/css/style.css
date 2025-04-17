@@ -149,7 +149,95 @@ input[type="range"] {
         margin-bottom: 10px; /* Add space between controls */
     }
 }
-
+/* Leaderboard Responsive Styles */
+@media screen and (max-width: 768px) {
+    .leaderboard-container {
+        overflow-x: auto;
+        padding: 0 10px;
+    }
+    
+    .leaderboard-columns {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .leaderboard-column {
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+    
+    .leaderboard-table {
+        font-size: 12px;
+    }
+    
+    .leaderboard-table th,
+    .leaderboard-table td {
+        padding: 6px 8px;
+    }
+    
+    .leaderboard-separator td {
+        font-size: 12px;
+    }
+}
+/* Mode Selection Screen Responsive Styles */
+@media screen and (max-width: 768px) {
+    .mode-buttons {
+        gap: 10px;
+        padding: 0 10px;
+    }
+    
+    .mode-btn {
+        width: 100%;
+        max-width: 280px;
+        margin: 10px auto;
+        height: 200px;
+        padding: 15px;
+    }
+    
+    .mode-btn h2 {
+        font-size: 1.2rem;
+    }
+    
+    .mode-btn p {
+        font-size: 0.9rem;
+    }
+    
+    .mode-btn .note {
+        font-size: 0.8rem;
+    }
+}
+/* General Responsive Styles */
+@media screen and (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    .container {
+        padding: 10px;
+    }
+    
+    .screen {
+        padding: 10px;
+    }
+    
+    .button {
+        padding: 10px 20px;
+        font-size: 1rem;
+    }
+    
+    #name-input-screen {
+        max-width: 100%;
+        padding: 10px;
+    }
+    
+    #patient-name {
+        width: 100%;
+        max-width: 300px;
+        margin: 10px auto;
+        padding: 10px;
+    }
+}
 .square {
     display: flex;
     justify-content: center;
