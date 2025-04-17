@@ -235,37 +235,82 @@ input[type="range"] {
     border-radius: 5px;
 }
 
-/* Leaderboard Styles */
+/* Leaderboard Container */
 .leaderboard-container {
-    margin: 20px auto;
-    max-width: 700px;
-    text-align: center;
+    width: 100%;
+    overflow-x: auto;
+    margin: 20px 0;
 }
 
-#leaderboard-table {
+/* Leaderboard Columns Layout */
+.leaderboard-columns {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+}
+
+.leaderboard-column {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Leaderboard Table Styles */
+.leaderboard-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 15px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin-top: 10px;
 }
 
-#leaderboard-table th, #leaderboard-table td {
-    padding: 10px;
+.leaderboard-table th, 
+.leaderboard-table td {
+    padding: 10px 12px;
+    text-align: left;
     border: 1px solid #ddd;
 }
 
-#leaderboard-table th {
+.leaderboard-table th {
     background-color: #f2f2f2;
     font-weight: bold;
 }
 
-#leaderboard-table tr:nth-child(even) {
+.leaderboard-table tr:nth-child(even) {
     background-color: #f9f9f9;
 }
 
-#leaderboard-table tr.current-user {
-    background-color: #fffde7;
+/* Leaderboard Highlight Fix */
+.leaderboard-table tr.current-user {
+    background-color: #fff04a !important;
     font-weight: bold;
+}
+
+/* Add separator styling */
+.leaderboard-separator td {
+    background-color: #f2f2f2;
+    font-weight: bold;
+    color: #666;
+    padding: 8px 12px;
+}
+
+/* Ensure the separator text is centered and properly styled */
+.leaderboard-separator td span {
+    font-weight: bold;
+    color: #333;
+}
+
+/* Loading State */
+#leaderboard-loading {
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+    color: #666;
+}
+
+.leaderboard-separator {
+    text-align: center;
+    background-color: #f2f2f2;
+    font-weight: bold;
+    color: #666;
+    height: 30px;
 }
 
 .results-buttons {
@@ -368,4 +413,76 @@ input[type="range"] {
     padding: 25px;  /* Add padding to make room for labels */
     width: 600px;
     height: 600px;
+}
+
+/* Intro Screen */
+.intro-text {
+    font-size: 1.2rem;
+    margin: 20px 0;
+}
+
+.mode-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.mode-btn {
+    width: 220px;
+    height: 280px;
+    padding: 20px;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+    background-color: #f8f8f8;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.mode-btn:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    border-color: #4CAF50;
+}
+
+.mode-btn h2 {
+    margin: 0 0 15px 0;
+    color: #333;
+}
+
+.mode-btn p {
+    margin: 5px 0;
+    color: #555;
+}
+
+.mode-btn .note {
+    margin-top: 15px;
+    font-style: italic;
+    color: #777;
+}
+
+#training-btn {
+    background-color: #e8f5e9;
+    border-color: #81c784;
+}
+
+#easy-btn {
+    background-color: #e3f2fd;
+    border-color: #64b5f6;
+}
+
+#medium-btn {
+    background-color: #fff8e1;
+    border-color: #ffd54f;
+}
+
+#hard-btn {
+    background-color: #ffebee;
+    border-color: #e57373;
 }

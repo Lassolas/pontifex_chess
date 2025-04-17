@@ -19,32 +19,41 @@
 
     <!-- Intro Screen -->
     <div id="intro-screen" class="screen" style="display: none;">
-        <h1>Test Configuration</h1>
-        <div class="config-container">
-            <div class="difficulty-section">
-                <h2>Select Difficulty</h2>
-                <div class="difficulty-buttons">
-                    <button class="difficulty-btn">Easy</button>
-                    <button class="difficulty-btn">Medium</button>
-                    <button class="difficulty-btn">Hard</button>
-                    <button class="difficulty-btn">Very Hard</button>
-                </div>
-            </div>
-            <div class="duration-section">
-                <h2>Test Duration</h2>
-                <div class="duration-buttons">
-                    <button class="duration-btn">Short (20 sec)</button>
-                    <button class="duration-btn">Medium (1.5 min)</button>
-                    <button class="duration-btn">Long (3 min)</button>
-                    <button class="duration-btn">Extended (6 min)</button>
-                </div>
-            </div>
-            <div class="time-section">
-                <h2>Board Display Time</h2>
-                <input type="range" id="time-slider" min="0.1" max="10" step="0.1" value="3">
-                <span id="time-value">3.0s</span>
-            </div>
-            <button id="begin-button">Begin Test</button>
+        <h1>Chess Attack Recognition Task</h1>
+        <p class="intro-text">Select a test mode to begin:</p>
+        
+        <div class="mode-buttons">
+            <button id="training-btn" class="mode-btn">
+                <h2>Training</h2>
+                <p>Difficulty: Easy</p>
+                <p>Board Display: 5s</p>
+                <p>Duration: 1 min</p>
+                <p class="note">Results not saved</p>
+            </button>
+            
+            <button id="easy-btn" class="mode-btn">
+                <h2>Easy</h2>
+                <p>Difficulty: Easy</p>
+                <p>Board Display: 5s</p>
+                <p>Duration: 3 min</p>
+                <p class="note">Results saved</p>
+            </button>
+            
+            <button id="medium-btn" class="mode-btn">
+                <h2>Medium</h2>
+                <p>Difficulty: Hard</p>
+                <p>Board Display: 3s</p>
+                <p>Duration: 3 min</p>
+                <p class="note">Results saved</p>
+            </button>
+            
+            <button id="hard-btn" class="mode-btn">
+                <h2>Hard</h2>
+                <p>Difficulty: Very Hard</p>
+                <p>Board Display: 1s</p>
+                <p>Duration: 3 min</p>
+                <p class="note">Results saved</p>
+            </button>
         </div>
     </div>
 
@@ -75,28 +84,66 @@
         <div id="leaderboard-container" class="leaderboard-container">
             <h2>Leaderboard</h2>
             <div id="leaderboard-loading">Loading leaderboard...</div>
-            <table id="leaderboard-table" style="display: none;">
-                <thead>
-                    <tr>
-                        <th>Rank</th>
-                        <th>Name</th>
-                        <th>IES (s)</th>
-                        <th>Difficulty</th>
-                        <th>Board Time</th>
-                    </tr>
-                </thead>
-                <tbody id="leaderboard-body">
-                    <!-- Leaderboard entries will be added here dynamically -->
-                </tbody>
-            </table>
+            <div id="leaderboard-tables" style="display: none;">
+                <div class="leaderboard-columns">
+                    <div class="leaderboard-column">
+                        <h3>Easy</h3>
+                        <table class="leaderboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Name</th>
+                                    <th>IES (s)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-easy">
+                                <!-- Easy difficulty entries will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="leaderboard-column">
+                        <h3>Medium</h3>
+                        <table class="leaderboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Name</th>
+                                    <th>IES (s)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-medium">
+                                <!-- Medium difficulty entries will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="leaderboard-column">
+                        <h3>Hard</h3>
+                        <table class="leaderboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Name</th>
+                                    <th>IES (s)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-hard">
+                                <!-- Hard difficulty entries will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="results-buttons">
-        <button id="download-button">Download Results</button>
-    </div>
+            <button id="download-button">Download Results</button>
+            <button id="restart-button">Try Again</button>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/chess.js') }}"></script>
     <script src="{{ url_for('static', filename='js/game.js') }}"></script>
 </body>
-</html> 
+</html>

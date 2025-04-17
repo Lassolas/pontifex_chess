@@ -22,7 +22,13 @@ class GameUI {
 
         this.nameInput = document.getElementById('patient-name');
         this.startButton = document.getElementById('start-button');
-        this.beginButton = document.getElementById('begin-button');
+        
+        // Mode buttons
+        this.trainingBtn = document.getElementById('training-btn');
+        this.easyBtn = document.getElementById('easy-btn');
+        this.mediumBtn = document.getElementById('medium-btn');
+        this.hardBtn = document.getElementById('hard-btn');
+        
         this.downloadButton = document.getElementById('download-button');
         this.restartButton = document.getElementById('restart-button');
 
@@ -62,23 +68,32 @@ class GameUI {
 
     initializeEventListeners() {
         // Name input screen
-        this.startButton.addEventListener('click', () => this.handleNameInput());
-
-        // Intro screen
-        this.difficultyButtons.forEach(btn => {
-            btn.addEventListener('click', () => this.handleDifficultySelection(btn));
+        this.startButton.addEventListener('click', () => {
+            const name = this.nameInput.value.trim();
+            if (name) {
+                this.patientName = name;
+                this.showScreen('intro');
+            } else {
+                alert('Please enter your name to continue.');
+            }
         });
-        this.durationButtons.forEach(btn => {
-            btn.addEventListener('click', () => this.handleDurationSelection(btn));
-        });
-        this.timeSlider.addEventListener('input', () => this.handleTimeSlider());
-        this.beginButton.addEventListener('click', () => this.startCountdown());
-
+        
+        // Mode button event listeners
+        this.trainingBtn.addEventListener('click', () => this.handleModeSelection('training'));
+        this.easyBtn.addEventListener('click', () => this.handleModeSelection('easy'));
+        this.mediumBtn.addEventListener('click', () => this.handleModeSelection('medium'));
+        this.hardBtn.addEventListener('click', () => this.handleModeSelection('hard'));
+        
         // Game screen
         this.chessboard.addEventListener('click', (e) => this.handleChessboardClick(e));
-
+        
         // Results screen
         this.downloadButton.addEventListener('click', () => this.downloadResults());
+        
+        // Only add event listener if the button exists
+        if (this.restartButton) {
+            this.restartButton.addEventListener('click', () => this.restartGame());
+        }
     }
 
     showScreen(screenName) {
@@ -87,30 +102,48 @@ class GameUI {
         this.currentScreen = screenName;
     }
 
-    handleNameInput() {
-        this.patientName = this.nameInput.value.trim();
-        if (this.patientName) {
+    handleStartClick() {
+        const name = this.nameInput.value.trim();
+        if (name) {
+            this.patientName = name;
             this.showScreen('intro');
+        } else {
+            alert('Please enter your name to continue.');
         }
     }
-
-    handleDifficultySelection(button) {
-        this.difficultyButtons.forEach(btn => btn.classList.remove('selected'));
-        button.classList.add('selected');
-        this.game.difficulty = button.textContent;
-    }
-
-    handleDurationSelection(button) {
-        this.durationButtons.forEach(btn => btn.classList.remove('selected'));
-        button.classList.add('selected');
-        // Extract the duration option from the button text (e.g., "Short (1 min)" -> "Short")
-        const durationOption = button.textContent.split(' ')[0];
-        this.game.setDuration(durationOption);
-    }
-
-    handleTimeSlider() {
-        this.game.hideTime = parseFloat(this.timeSlider.value);
-        this.timeValue.textContent = `${this.game.hideTime.toFixed(1)}s`;
+    
+    // Add a new method for handling mode selection
+    handleModeSelection(mode) {
+        // Set game configuration based on selected mode
+        switch (mode) {
+            case 'training':
+                this.game.difficulty = 'Easy';
+                this.game.boardDisplayTime = 5;
+                this.game.duration = 60; // 1 minute
+                this.game.saveResults = false; // Don't save training results
+                break;
+            case 'easy':
+                this.game.difficulty = 'Easy';
+                this.game.boardDisplayTime = 5;
+                this.game.duration = 20; // 3 minutes
+                this.game.saveResults = true;
+                break;
+            case 'medium':
+                this.game.difficulty = 'Hard';
+                this.game.boardDisplayTime = 3;
+                this.game.duration = 20; // 3 minutes
+                this.game.saveResults = true;
+                break;
+            case 'hard':
+                this.game.difficulty = 'Very Hard';
+                this.game.boardDisplayTime = 1;
+                this.game.duration = 20; // 3 minutes
+                this.game.saveResults = true;
+                break;
+        }
+        
+        // Start countdown
+        this.startCountdown();
     }
 
     startCountdown() {
@@ -165,7 +198,7 @@ class GameUI {
             // Store the time when the attacking piece is shown
             this.game.attackingPieceShownTime = Date.now();
         
-        }, this.game.hideTime * 1000);
+        }, this.game.boardDisplayTime * 1000);
     }
 
     startTimer() {
@@ -290,17 +323,62 @@ class GameUI {
         this.submitResults(IES);
         
     }
+    
+    restartGame() {
+        this.showScreen('name-input');
+        this.game = new ChessGame(); // Reset the game
+        this.patientName = '';
+        this.nameInput.value = '';
+    }
 
     async fetchLeaderboard() {
+        console.log('Starting fetchLeaderboard');
         const leaderboardLoading = document.getElementById('leaderboard-loading');
-    
+        leaderboardLoading.textContent = 'Loading leaderboard...';
+        
+        console.log('Fetching leaderboard data...');
+        
         try {
+            console.log('Before fetch request');
             const response = await fetch('/get_leaderboard');
-            const data = await response.json();
+            console.log('Fetch response status:', response.status);
             
-            if (data.success && data.leaderboard.length > 0) {
+            const responseText = await response.text();
+            console.log('Raw response text:', responseText);
+            
+            // Try to parse as JSON (this might fail if the response isn't valid JSON)
+            let data;
+            try {
+                data = JSON.parse(responseText);
+                console.log('Parsed JSON data:', data);
+            } catch (parseError) {
+                console.error('Error parsing JSON:', parseError);
+                leaderboardLoading.textContent = 'Error parsing leaderboard data';
+                return;
+            }
+            // After parsing the JSON
+            console.log('Response object type:', typeof data);
+            console.log('Response keys:', Object.keys(data));
+            
+            if (data.success) {
+                console.log('Success is true');
+                console.log('Leaderboard present:', !!data.leaderboard);
+                console.log('Leaderboard type:', typeof data.leaderboard);
+            } else {
+                console.log('Success is false, message:', data.message);
+            }
+            console.log('Response success:', data.success);
+            console.log('Has leaderboard property:', data.hasOwnProperty('leaderboard'));
+            
+            if (data.success && data.leaderboard) {
+                console.log('Leaderboard data structure:', Object.keys(data.leaderboard));
+                console.log('Easy entries:', data.leaderboard.easy?.length || 0);
+                console.log('Medium entries:', data.leaderboard.medium?.length || 0);
+                console.log('Hard entries:', data.leaderboard.hard?.length || 0);
+                
                 this.displayLeaderboard(data.leaderboard);
             } else {
+                console.warn('Leaderboard data not available or empty:', data);
                 leaderboardLoading.textContent = 'No leaderboard data available.';
             }
         } catch (error) {
@@ -310,78 +388,151 @@ class GameUI {
     }
 
     async submitResults(IES) {
+        // Skip submission for training mode
+        if (!this.game.saveResults) {
+            console.log('Training mode - results not saved');
+            // Still show the leaderboard
+            this.fetchLeaderboard();
+            return;
+        }
+        
         try {
+            // Log values before sending
+            console.log('Submitting with boardDisplayTime:', this.game.boardDisplayTime);
+            
             const response = await fetch('/submit_results', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     patientName: this.patientName,
                     trialData: this.game.trialData,
                     difficulty: this.game.difficulty,
-                    testDuration: this.game.duration,
-                    boardDisplayTime: this.game.hideTime,
+                    duration: this.game.duration,
+                    boardDisplayTime: this.game.boardDisplayTime,  // Use the new name consistently
                     IES: IES
                 })
             });
-
-            const data = await response.json();
-            console.log('Results submitted:', data);
             
-            // If the response includes leaderboard data, display it
-            if (data.leaderboard) {
-                this.displayLeaderboard(data.leaderboard);
+            const data = await response.json();
+            
+            if (data.success) {
+                // If leaderboard data is included in the response, use it
+                if (data.leaderboard) {
+                    console.log('Leaderboard received with submission response');
+                    this.displayLeaderboard(data.leaderboard);
+                } else {
+                    // Otherwise fetch it separately (backwards compatibility)
+                    this.fetchLeaderboard();
+                }
             } else {
-                // Fallback to fetching leaderboard separately if not included
-                this.fetchLeaderboard();
+                console.error('Error submitting results:', data.message);
             }
+            
         } catch (error) {
             console.error('Error submitting results:', error);
+            // Try to fetch leaderboard anyway
+            this.fetchLeaderboard();
         }
     }
     // New function to display leaderboard data
+    // In game.js, update the displayLeaderboard function:
     displayLeaderboard(leaderboardData) {
-        const leaderboardLoading = document.getElementById('leaderboard-loading');
-        const leaderboardTable = document.getElementById('leaderboard-table');
-        const leaderboardBody = document.getElementById('leaderboard-body');
+        console.log('displayLeaderboard called with data:', leaderboardData);
         
-        if (leaderboardData && leaderboardData.length > 0) {
-            // Clear previous entries
-            leaderboardBody.innerHTML = '';
+        // Check data validity
+        const isValid = leaderboardData && 
+            typeof leaderboardData === 'object' &&
+            (Array.isArray(leaderboardData.easy) || 
+            Array.isArray(leaderboardData.medium) || 
+            Array.isArray(leaderboardData.hard));
+        
+        console.log('Is leaderboard data valid?', isValid);
+        
+        if (!isValid) {
+            console.error('Invalid leaderboard data structure:', leaderboardData);
+            document.getElementById('leaderboard-loading').textContent = 
+                'Error: Received invalid leaderboard data format';
+            return;
+        }
+        const leaderboardLoading = document.getElementById('leaderboard-loading');
+        const leaderboardTables = document.getElementById('leaderboard-tables');
+        const leaderboardEasy = document.getElementById('leaderboard-easy');
+        const leaderboardMedium = document.getElementById('leaderboard-medium');
+        const leaderboardHard = document.getElementById('leaderboard-hard');
+        
+        if (leaderboardData && 
+            (leaderboardData.easy?.length > 0 || 
+            leaderboardData.medium?.length > 0 || 
+            leaderboardData.hard?.length > 0)) {
             
-            // Add each leaderboard entry
-            leaderboardData.forEach(entry => {
-                const row = document.createElement('tr');
-                
-                // Highlight current user
-                if (entry.name === this.patientName) {
-                    row.classList.add('current-user');
-                }
-                
-                row.innerHTML = `
-                    <td>${entry.rank}</td>
-                    <td>${entry.name}</td>
-                    <td>${entry.ies}</td>
-                    <td>${entry.difficulty}</td>
-                    <td>${entry.boardTime}s</td>
-                `;
-                
-                leaderboardBody.appendChild(row);
-            });
-            
-            // Show the table and hide loading message
+            // Show table, hide loading
+            leaderboardTables.style.display = 'block';
             leaderboardLoading.style.display = 'none';
-            leaderboardTable.style.display = 'table';
+            
+            // Clear previous entries
+            leaderboardEasy.innerHTML = '';
+            leaderboardMedium.innerHTML = '';
+            leaderboardHard.innerHTML = '';
+            
+            // Helper function to display rows
+            const displayRows = (entries, container, difficulty) => {
+                const currentUserName = this.patientName;
+                const currentEntry = entries.find(e => e.name === currentUserName);
+                
+                // Display top 10 entries
+                entries
+                    .slice(0, 10)
+                    .forEach(entry => {
+                        const row = document.createElement('tr');
+                        row.className = entry.name === currentUserName ? 'current-user' : '';
+                        row.innerHTML = `
+                            <td>${entry.rank}</td>
+                            <td>${entry.name}</td>
+                            <td>${entry.score}</td>
+                        `;
+                        container.appendChild(row);
+                    });
+                
+                // In the displayRows function
+                if (currentEntry && parseInt(currentEntry.rank) > 10) {
+                    const separator = document.createElement('tr');
+                    separator.className = 'current-user';  // Use current-user class for highlighting
+                    separator.innerHTML = `
+                        <td colspan="3" style="text-align: center;">
+                            <span style="font-weight: bold;">${currentEntry.name}</span> - Rank: ${currentEntry.rank} - IES: ${currentEntry.score}
+                        </td>
+                    `;
+                    container.appendChild(separator);
+                }
+            };
+            
+            // Display for each difficulty
+            displayRows(leaderboardData.easy, leaderboardEasy, 'Easy');
+            displayRows(leaderboardData.medium, leaderboardMedium, 'Medium');
+            displayRows(leaderboardData.hard, leaderboardHard, 'Hard');
         } else {
+            // No data available
+            leaderboardTables.style.display = 'none';
+            leaderboardLoading.style.display = 'block';
             leaderboardLoading.textContent = 'No leaderboard data available.';
         }
     }
+
     downloadResults() {
+        // Map difficulty values to button names
+        let displayDifficulty = "Easy";
+        if (this.game.difficulty === "Hard") {
+            displayDifficulty = "Medium";
+        } else if (this.game.difficulty === "Very Hard") {
+            displayDifficulty = "Hard";
+        }
+        
         const csvContent = [
-            ['Difficulty', this.game.difficulty],  // Header for Difficulty
+            ['Difficulty', displayDifficulty],  // Header for Difficulty with mapped name
             ['Test Duration', this.game.duration],  // Header for Test Duration
-            ['Board Display Time', this.game.hideTime],  // Header for Board Display Time
+            ['Board Display Time', this.game.boardDisplayTime],  // Header for Board Display Time
             ['IES', this.game.IES],  // Header for IES
             ['Trial', 'Trial Time', 'Attacking Piece', 'Attacking Position', 'Attacked Pieces', 'Response Time', 'Success', 'Response Position'],
             ...this.game.trialData.map(trial => [

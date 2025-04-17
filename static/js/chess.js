@@ -40,14 +40,15 @@ class ChessGame {
         this.hasResponded = false;
         this.trialData = [];
         this.currentTrial = 0;
-        this.duration = DURATION_OPTIONS.Medium; // Default to 3 minutes
+        this.duration = 180; // Default to 3 minutes
         this.hideTime = 3.0;
-        this.difficulty = "Medium";
+        this.difficulty = 'Easy';
         this.timeOptions = [0.1, 0.5, 1, 3, 5, 10];  // Available time options in seconds
         this.attackingPieceShownTime = null;  // Track when the attacking piece is shown
         this.trialStartTime = null;  // Track the start time of the trial
         this.startTime = Date.now();  // Store the start time of the experience
-
+        this.IES = null; // Store the Inverse Efficiency Score
+        this.saveResults = true; // Whether to save results to the server
     }
 
     initializeControls() {
@@ -260,7 +261,8 @@ class ChessGame {
             
             if (possibleSquares.length > 0) {
                 // Step 3: Place attacked piece
-                const [attackedRow, attackedCol] = possibleSquares[Math.floor(Math.random() * possibleSquares.length)];
+                const attackIndex = Math.floor(Math.random() * possibleSquares.length);
+                const [attackedRow, attackedCol] = possibleSquares[attackIndex];
                 const defendingColor = attackingColor === 'w' ? 'b' : 'w';
                 
                 // Choose a random unused piece type for the attacked piece
@@ -289,8 +291,32 @@ class ChessGame {
                 
                 this.board[attackedRow][attackedCol] = defendingColor + defendingType;
                 this.attackingPiece = [attackingPiece, attackingRow, attackingCol];
-                //this.attackedPieces = [[attackedRow, attackedCol]];
                 this.attackedPieces = [[attackedRow, attackedCol]];
+                
+                // Track squares between attacking and attacked pieces to avoid placing other pieces there
+                this.blockedSquares = [];
+                
+                // Only for sliding pieces (Queen, Rook, Bishop)
+                if (!['K', 'N', 'P'].includes(attackingType)) {
+                    // Determine the direction vector from attacking to attacked piece
+                    const rowDiff = attackedRow - attackingRow;
+                    const colDiff = attackedCol - attackingCol;
+                    
+                    // Normalize to get direction
+                    const rowDir = rowDiff === 0 ? 0 : rowDiff > 0 ? 1 : -1;
+                    const colDir = colDiff === 0 ? 0 : colDiff > 0 ? 1 : -1;
+                    
+                    // Add all squares between attacking and attacked pieces to blockedSquares
+                    let currentRow = attackingRow + rowDir;
+                    let currentCol = attackingCol + colDir;
+                    
+                    while (currentRow !== attackedRow || currentCol !== attackedCol) {
+                        this.blockedSquares.push([currentRow, currentCol]);
+                        currentRow += rowDir;
+                        currentCol += colDir;
+                    }
+                }
+                
                 validPosition = true;
             } else {
                 this.board[attackingRow][attackingCol] = null;
@@ -298,6 +324,23 @@ class ChessGame {
         }
         
         // Step 4: Fill remaining pieces randomly
+        // Create a list of all empty squares (excluding blocked squares)
+        const emptySquares = [];
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                if (this.board[row][col] === null) {
+                    // Check if this square is not in blockedSquares
+                    const isBlocked = this.blockedSquares && this.blockedSquares.some(
+                        ([blockedRow, blockedCol]) => blockedRow === row && blockedCol === col
+                    );
+                    
+                    if (!isBlocked) {
+                        emptySquares.push([row, col]);
+                    }
+                }
+            }
+        }
+        
         let piecesPlaced = 2;  // We've placed 2 pieces so far
         let attempts = 0;
         const maxAttempts = 100;  // Prevent infinite loops
@@ -318,7 +361,8 @@ class ChessGame {
             let row = type === 'P' ? Math.floor(Math.random() * 6) + 1 : Math.floor(Math.random() * 8);
             let col = Math.floor(Math.random() * 8);
             
-            if (this.board[row][col] === null) {
+            // Ensure the square is empty and not blocked
+            if (emptySquares.some(([r, c]) => r === row && c === col)) {
                 this.board[row][col] = piece;
                 
                 // Check if kings are adjacent
