@@ -263,21 +263,26 @@ class GameUI {
     endGame() {
         clearInterval(this.timer);
         this.showScreen('results');
-        
+
         // Calculate and display summary
         const totalTrials = this.game.trialData.length;
         const successfulTrials = this.game.trialData.filter(trial => trial.success === 1).length;
         const successRate = ((successfulTrials / totalTrials) * 100).toFixed(1);
-        
-        // Calculate average response time for successful trials
-        const averageRT = (this.game.trialData
-            .filter(trial => trial.success === 1)
-            .reduce((sum, trial) => sum + trial.responseTime, 0) / successfulTrials).toFixed(2);
-        
-        // Calculate IES
-        const accuracy = successfulTrials / totalTrials || 1; // Avoid division by zero
-        const IES = (averageRT / accuracy).toFixed(2); // Compute IES
 
+    
+        // Calculate average response time for successful trials (raw value, unrounded)
+        const rawAverageRT = this.game.trialData
+            .filter(trial => trial.success === 1)
+            .reduce((sum, trial) => sum + trial.responseTime, 0) / successfulTrials;
+
+        // Calculate IES using unrounded averageRT
+        const accuracy = successfulTrials / totalTrials || 1; // Avoid division by zero
+        const rawIES = rawAverageRT / accuracy;
+
+        // Display rounded values
+        const averageRT = rawAverageRT.toFixed(2);
+        const IES = rawIES.toFixed(2);
+        
         this.resultsSummary.innerHTML = `
             <p>Total Trials: ${totalTrials}</p>
             <p>Successful Trials: ${successfulTrials}</p>
@@ -352,4 +357,4 @@ class GameUI {
 // Initialize the game when the page loads
 window.addEventListener('load', () => {
     new GameUI();
-}); 
+});

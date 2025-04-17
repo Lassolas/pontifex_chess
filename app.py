@@ -5,7 +5,6 @@ import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
-import csv
 
 
 app = Flask(__name__)
@@ -52,6 +51,58 @@ def get_sheets_service():
         print(f"Error loading credentials or creating service: {str(e)}")
         raise  # Re-raise the exception for further handling
 
+# update leaderboard automatically
+def update_leaderboard(service):
+    try:
+        print("Updating leaderboard...")
+
+        spreadsheet = service.get(spreadsheetId=SHEET_ID).execute()
+        sheet_titles = [s['properties']['title'] for s in spreadsheet['sheets']]
+        leaderboard_sheet_name = "leaderboard"
+
+        # Create leaderboard sheet if it doesn't exist
+        if leaderboard_sheet_name not in sheet_titles:
+            service.batchUpdate(spreadsheetId=SHEET_ID, body={
+                "requests": [{
+                    "addSheet": {
+                        "properties": {"title": leaderboard_sheet_name}
+                    }
+                }]
+            }).execute()
+
+        leaderboard_data = [["Name", "IES", "Difficulty", "Board"]]
+
+        for sheet_name in sheet_titles:
+            if sheet_name == leaderboard_sheet_name:
+                continue
+
+            values = service.values().get(spreadsheetId=SHEET_ID, range=f"{sheet_name}!A1:B20").execute().get("values", [])
+            data_dict = {row[0]: row[1] for row in values if len(row) > 1}
+
+            try:
+                ies = float(data_dict.get("IES"))
+                difficulty = data_dict.get("Difficulty", "N/A")
+                board_time = float(data_dict.get("Board Display Time", 0))
+                leaderboard_data.append([sheet_name, ies, difficulty, board_time])
+            except Exception as e:
+                print(f"Skipping sheet {sheet_name} due to missing or invalid data: {e}")
+
+        # Sort leaderboard by IES (ascending)
+        leaderboard_data[1:] = sorted(leaderboard_data[1:], key=lambda x: x[1])
+
+        # Clear the leaderboard sheet and write new data
+        service.values().clear(spreadsheetId=SHEET_ID, range=f"{leaderboard_sheet_name}!A1:D1000").execute()
+        service.values().update(
+            spreadsheetId=SHEET_ID,
+            range=f"{leaderboard_sheet_name}!A1",
+            valueInputOption="RAW",
+            body={"values": leaderboard_data}
+        ).execute()
+
+        print("Leaderboard updated successfully.")
+    except Exception as e:
+        print("Error updating leaderboard:", e)
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -75,7 +126,7 @@ def submit_results():
         difficulty = data.get('difficulty', 'N/A')
         test_duration = data.get('testDuration', 'N/A')
         board_display_time = data.get('boardDisplayTime', 'N/A')
-        IES = data.get('IES')  # Get the IES score
+        IES = data.get('IES', 'N/A')  # Get the IES score
         
         # Log the data being submitted
         print(f"Submitting results for patient: {patient_name}")
@@ -149,17 +200,8 @@ def submit_results():
 
         # Log the result from the Google Sheets API
         print("Google Sheets API response:", result)
-
-        # Here you would add your logic to save to Google Sheets or CSV
-        # For example, saving to a CSV file
-        with open('results.csv', mode='a', newline='') as file:
-            writer = csv.writer(file)
-            # Write headers if the file is empty
-            if file.tell() == 0:
-                writer.writerow(['Patient Name', 'Difficulty', 'Test Duration', 'Board Display Time', 'IES', 'Trial', 'Trial Time', 'Attacking Piece', 'Attacking Position', 'Attacked Pieces', 'Response Time', 'Success', 'Response Position'])
-            
-            for trial in trial_data:
-                writer.writerow([patient_name, difficulty, test_duration, board_display_time, IES, trial['trial'], trial['trialTime'], trial['attackingPiece'], trial['attackingPosition'], trial['attackedPieces'], trial['responseTime'], trial['success'], trial['responsePosition']])
+        # ✅ Trigger leaderboard update
+        update_leaderboard(service)
 
         return jsonify({'status': 'success', 'message': f'Results saved to sheet {new_sheet_name}'})
     except Exception as e:
