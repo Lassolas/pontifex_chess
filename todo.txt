@@ -1,5 +1,6 @@
 TODO LIST
 
 18/04/2025
+- update the training phase to give color feedback.
 - Add a focus performance score. (constant focus vs decline) 
 to motivate people to focus more despite being tired.
