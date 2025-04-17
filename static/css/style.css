@@ -238,6 +238,61 @@ input[type="range"] {
         padding: 10px;
     }
 }
+
+/* Name Input Screen Styles */
+.input-container {
+    max-width: 100%;
+    margin: 20px auto;
+    padding: 20px;
+    text-align: center;
+}
+
+#patient-name {
+    width: 100%;
+    max-width: 300px;
+    margin: 10px auto;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+#start-button {
+    width: 100%;
+    max-width: 300px;
+    margin: 10px auto;
+    padding: 12px;
+    font-size: 16px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+#start-button:active {
+    background-color: #45a049;
+}
+
+/* Mobile-specific styles */
+@media screen and (max-width: 768px) {
+    .input-container {
+        padding: 15px;
+    }
+    
+    #patient-name,
+    #start-button {
+        width: 100%;
+        max-width: 280px;
+        margin: 15px auto;
+    }
+    
+    #start-button {
+        padding: 14px;
+    }
+}
+
 .square {
     display: flex;
     justify-content: center;

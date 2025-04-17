@@ -68,7 +68,20 @@ class GameUI {
 
     initializeEventListeners() {
         // Name input screen
-        this.startButton.addEventListener('click', () => {
+        this.startButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            const name = this.nameInput.value.trim();
+            if (name) {
+                this.patientName = name;
+                this.showScreen('intro');
+            } else {
+                alert('Please enter your name to continue.');
+            }
+        });
+        
+        // Add touch event listener for mobile devices
+        this.startButton.addEventListener('touchend', (e) => {
+            e.preventDefault();
             const name = this.nameInput.value.trim();
             if (name) {
                 this.patientName = name;
