@@ -7,6 +7,7 @@ from googleapiclient.discovery import build
 from dotenv import load_dotenv
 import logging
 import re
+import math
 
 app = Flask(__name__)
 
@@ -33,7 +34,7 @@ def redact_sensitive_data(message):
             r'token"?\s*:\s*"[^"]*"',
             r'password"?\s*:\s*"[^"]*"',
             r'secret"?\s*:\s*"[^"]*"',
-            r'credential"?\s*:\s*"[^"]*"',
+            r'credential"?\scorr*:\s*"[^"]*"',
             r'auth"?\s*:\s*"[^"]*"'
         ]
         
@@ -79,7 +80,7 @@ def get_sheets_service():
         raise  # Re-raise the exception for further handling
 
 # update leaderboard automatically
-def update_leaderboard(service, current_user=None, current_difficulty=None, current_ies=None, current_board_time=None):
+def update_leaderboard(service, current_user=None, current_difficulty=None, current_ies=None, current_board_time=None, current_drift=None, current_stability=None):
     try:
         safe_log('info', "Updating leaderboard...")
 
@@ -113,13 +114,13 @@ def update_leaderboard(service, current_user=None, current_difficulty=None, curr
         hard_entries = []
 
         # Add current user if provided
-        if current_user and current_difficulty and current_ies is not None:
+        if current_user and current_difficulty and current_ies is not None and current_drift is not None and current_stability is not None:
             if current_difficulty.lower() == "easy":
-                easy_entries.append([current_user, current_ies, current_difficulty, current_board_time])
+                easy_entries.append([current_user, current_ies, current_drift, current_stability, current_difficulty, current_board_time])
             elif current_difficulty.lower() == "medium":
-                medium_entries.append([current_user, current_ies, current_difficulty, current_board_time])
+                medium_entries.append([current_user, current_ies, current_drift, current_stability, current_difficulty, current_board_time])
             elif current_difficulty.lower() == "hard":
-                hard_entries.append([current_user, current_ies, current_difficulty, current_board_time])
+                hard_entries.append([current_user, current_ies, current_drift, current_stability, current_difficulty, current_board_time])
 
         # Collect existing entries from all sheets
         for sheet_name in sheet_titles:
@@ -135,12 +136,28 @@ def update_leaderboard(service, current_user=None, current_difficulty=None, curr
                 
                 data_dict = {row[0]: row[1] for row in values if len(row) > 1}
 
-                # Extract difficulty and IES
-                ies = float(data_dict.get("IES Score", data_dict.get("IES", 0)))
+                # Extract difficulty, IES, drift, and stability
+                ies = data_dict.get("Overall IES Score", data_dict.get("IES Score", data_dict.get("IES", "999999")))
+                try:
+                    ies = float(ies)
+                except (ValueError, TypeError):
+                    ies = 999999
+                
                 difficulty = data_dict.get("Difficulty", "N/A")
                 board_time = float(data_dict.get("Board Display Time", 0))
                 
-                entry = [sheet_name, ies, difficulty, board_time]
+                # Extract drift and stability
+                drift = data_dict.get("Focus Drift", "0")
+                stability = data_dict.get("Focus Stability", "0")
+                
+                try:
+                    drift = float(drift)
+                    stability = float(stability)
+                except (ValueError, TypeError):
+                    drift = 0
+                    stability = 0
+                
+                entry = [sheet_name, ies, drift, stability, difficulty, board_time]
                 
                 # Add to appropriate difficulty list
                 if difficulty.lower() == "easy":
@@ -165,8 +182,10 @@ def update_leaderboard(service, current_user=None, current_difficulty=None, curr
 
         # Prepare the leaderboard data with headers for Google Sheets
         leaderboard_data = [
-            ["Easy Difficulty", "", "", "Medium Difficulty", "", "", "Hard Difficulty", "", ""],
-            ["Rank", "Name", "IES (s)", "Rank", "Name", "IES (s)", "Rank", "Name", "IES (s)"]
+            ["Easy Difficulty", "", "", "", "", "Medium Difficulty", "", "", "", "Hard Difficulty", "", "", ""],
+            ["Rank", "Name", "IES (s)", "Drift", "Stability", 
+             "Rank", "Name", "IES (s)", "Drift", "Stability", 
+             "Rank", "Name", "IES (s)", "Drift", "Stability"]
         ]
 
         # Calculate the maximum number of entries across all difficulties
@@ -174,32 +193,47 @@ def update_leaderboard(service, current_user=None, current_difficulty=None, curr
         
         # Add all entries to the Google Sheet
         for i in range(max_entries):
-            row = []
-            
-            # Easy difficulty column
+            # Add easy entries
             if i < len(easy_entries):
-                row.extend([i+1, easy_entries[i][0], easy_entries[i][1]])
+                entry = easy_entries[i]
+                leaderboard_data.append([
+                    i + 1,  # Rank
+                    entry[0],  # Name
+                    entry[1],  # IES
+                    entry[2],  # Drift
+                    entry[3],  # Stability
+                    "", "", "", "", "",  # Medium placeholders
+                    "", "", "", "", ""   # Hard placeholders
+                ])
+            # Add medium entries
+            elif i < len(easy_entries) + len(medium_entries):
+                entry = medium_entries[i - len(easy_entries)]
+                leaderboard_data.append([
+                    "", "", "", "", "",  # Easy placeholders
+                    i + 1 - len(easy_entries),  # Rank
+                    entry[0],  # Name
+                    entry[1],  # IES
+                    entry[2],  # Drift
+                    entry[3],  # Stability
+                    "", "", "", "", ""   # Hard placeholders
+                ])
+            # Add hard entries
             else:
-                row.extend(["", "", ""])
-                
-            # Medium difficulty column
-            if i < len(medium_entries):
-                row.extend([i+1, medium_entries[i][0], medium_entries[i][1]])
-            else:
-                row.extend(["", "", ""])
-                
-            # Hard difficulty column
-            if i < len(hard_entries):
-                row.extend([i+1, hard_entries[i][0], hard_entries[i][1]])
-            else:
-                row.extend(["", "", ""])
-                
-            leaderboard_data.append(row)
-
+                entry = hard_entries[i - len(easy_entries) - len(medium_entries)]
+                leaderboard_data.append([
+                    "", "", "", "", "",  # Easy placeholders
+                    "", "", "", "", "",  # Medium placeholders
+                    i + 1 - len(easy_entries) - len(medium_entries),  # Rank
+                    entry[0],  # Name
+                    entry[1],  # IES
+                    entry[2],  # Drift
+                    entry[3]   # Stability
+                ])
+        
         # Clear the leaderboard sheet and write new data
         service.spreadsheets().values().clear(
             spreadsheetId=SHEET_ID, 
-            range=f"{leaderboard_sheet_name}!A1:I1000"
+            range=f"{leaderboard_sheet_name}!A1:O1000"
         ).execute()
         
         service.spreadsheets().values().update(
@@ -243,7 +277,7 @@ def get_leaderboard():
         # Get leaderboard data
         result = service.spreadsheets().values().get(
             spreadsheetId=SHEET_ID,
-            range="Leaderboard!A1:I1000"
+            range="Leaderboard!A1:O1000"
         ).execute()
         
         leaderboard_data = result.get('values', [])
@@ -289,11 +323,26 @@ def submit_results():
         # Validate required fields
         if not all([patient_name, trial_data, difficulty, board_display_time]):
             safe_log('error', f"Missing required fields - boardDisplayTime: {board_display_time}")
-            return jsonify({"success": False, "message": "Missing required fields"}), 400
+            return jsonify({
+                "success": False,
+                "message": "Missing required fields"
+            }), 400
 
-        # Calculate IES score
-        ies = calculate_ies(trial_data)
+        # Calculate IES from trial data
+        overall_ies, ies1, ies2, ies3, focus_drift, focus_stability = calculate_ies(
+            trial_data, 
+            duration=duration  # Pass duration to calculate_ies
+        )
         
+        # Check if we have insufficient trials
+        if overall_ies == 999999:
+            return jsonify({
+                "success": False,
+                "message": "Insufficient trials: At least 5 successful trials are required",
+                "required": 5,
+                "successful": sum(1 for trial in trial_data if trial.get('success') == 1)
+            }), 400
+
         # Create service
         service = get_sheets_service()
         
@@ -308,7 +357,12 @@ def submit_results():
             ['Difficulty', display_difficulty],
             ['Duration', duration],
             ['Board Display Time', board_display_time],
-            ['IES Score', ies],
+            ['Overall IES Score', overall_ies],
+            ['IES1 (First 60s)', ies1],
+            ['IES2 (Second 60s)', ies2],
+            ['IES3 (Last 60s)', ies3],
+            ['Focus Drift', focus_drift],
+            ['Focus Stability', focus_stability],
             ['Trial', 'Trial Time', 'Attacking Piece', 'Attacking Position', 
              'Attacked Pieces', 'Response Time', 'Success', 'Response Position']
         ]
@@ -354,15 +408,17 @@ def submit_results():
             service,
             current_user=patient_name,
             current_difficulty=display_difficulty.lower(),
-            current_ies=ies,
-            current_board_time=board_display_time
+            current_ies=overall_ies,
+            current_board_time=board_display_time,
+            current_drift=focus_drift,
+            current_stability=focus_stability
         )
         
         # 4. Get the updated leaderboard data to return
         try:
             result = service.spreadsheets().values().get(
                 spreadsheetId=SHEET_ID,
-                range="Leaderboard!A1:I1000"
+                range="Leaderboard!A1:O1000"
             ).execute()
             
             leaderboard_data = result.get('values', [])
@@ -373,13 +429,18 @@ def submit_results():
             # Return the leaderboard data with the results
             return jsonify({
                 "success": True, 
-                "ies": ies,
+                "ies": overall_ies,
+                "ies1": ies1,
+                "ies2": ies2,
+                "ies3": ies3,
+                "focus_drift": focus_drift,
+                "focus_stability": focus_stability,
                 "leaderboard": formatted_leaderboard  # Include the leaderboard directly in the response
             })
         except Exception as e:
             safe_log('error', f"Error getting updated leaderboard: {str(e)}")
             # Still return success for the submission, even if leaderboard fetch failed
-            return jsonify({"success": True, "ies": ies})
+            return jsonify({"success": True, "ies": overall_ies, "ies1": ies1, "ies2": ies2, "ies3": ies3, "focus_drift": focus_drift, "focus_stability": focus_stability})
         
     except Exception as e:
         safe_log('error', f"Error submitting results: {str(e)}")
@@ -401,45 +462,66 @@ def format_leaderboard_data(leaderboard_data):
     for i, row in enumerate(leaderboard_data[1:]):  # Skip header row
         try:
             # Skip header rows
-            if len(row) >= 9 and row[0] != "Rank" and row[3] != "Rank" and row[6] != "Rank":
-                # Easy column
-                if row[1] and row[1] != "Name":
-                    formatted_data['easy'].append({
-                        'rank': row[0],
-                        'name': row[1],
-                        'score': row[2]
-                    })
-                # Medium column
-                if row[4] and row[4] != "Name":
-                    formatted_data['medium'].append({
-                        'rank': row[3],
-                        'name': row[4],
-                        'score': row[5]
-                    })
-                # Hard column
-                if row[7] and row[7] != "Name":
-                    formatted_data['hard'].append({
-                        'rank': row[6],
-                        'name': row[7],
-                        'score': row[8]
-                    })
+            if len(row) >= 15 and row[0] != "Rank" and row[6] != "Rank" and row[12] != "Rank":
+                # Remove empty cells at the start
+                while row and not row[0]:
+                    row = row[1:]
+                
+                # Check if we have enough data after removing empty cells
+                if len(row) >= 5:  # Minimum for easy column
+                    # Easy column
+                    if row[0] != "Rank" and row[1] and row[1] != "Name":
+                        formatted_data['easy'].append({
+                            'rank': row[0],
+                            'name': row[1],
+                            'score': row[2],
+                            'drift': row[3],
+                            'stability': row[4]
+                        })
+                    # Medium column
+                    if len(row) >= 10 and row[5] != "Rank" and row[6] and row[6] != "Name":
+                        formatted_data['medium'].append({
+                            'rank': row[5],
+                            'name': row[6],
+                            'score': row[7],
+                            'drift': row[8],
+                            'stability': row[9]
+                        })
+                    # Hard column
+                    if len(row) >= 15 and row[10] != "Rank" and row[11] and row[11] != "Name":
+                        formatted_data['hard'].append({
+                            'rank': row[10],
+                            'name': row[11],
+                            'score': row[12],
+                            'drift': row[13],
+                            'stability': row[14]
+                        })
         except (IndexError, ValueError) as e:
             safe_log('warning', f"Skipping invalid leaderboard row {i+1}: {row}, error: {str(e)}")
+            continue  # Skip to next row if there's an error
     
     safe_log('info', f"Formatted leaderboard entries - Easy: {len(formatted_data['easy'])}, Medium: {len(formatted_data['medium'])}, Hard: {len(formatted_data['hard'])}")
     return formatted_data
 
-def calculate_ies(trial_data):
+def calculate_ies(trial_data, duration):
     """
-    Calculate Inverse Efficiency Score (IES) from trial data.
+    Calculate Inverse Efficiency Scores (IES) from trial data.
     IES = median response time / accuracy
+    
+    Returns:
+    - Overall IES
+    - IES1: First 60 seconds
+    - IES2: Second 60 seconds
+    - IES3: Last 60 seconds
+    - Focus Drift
+    - Focus Stability
     
     Includes:
     - Minimum trial threshold (require at least 5 successful trials)
     - Smoothing factor to prevent explosion when accuracy approaches 0
     """
     if not trial_data:
-        return 999999
+        return 999999, 999999, 999999, 999999, 0, 0
     
     # Calculate accuracy (proportion of successful trials)
     total_trials = len(trial_data)
@@ -447,35 +529,111 @@ def calculate_ies(trial_data):
     
     # Check minimum trial threshold
     if successful_trials < 5:
-        return 999999  # Return None to indicate insufficient trials
+        return 999999, 999999, 999999, 999999, 0, 0
     
-    # Calculate accuracy 
-    accuracy = successful_trials / total_trials if total_trials > 0 else 0  # Avoid division by zero
-    
-    # Calculate median response time for successful trials
-    if successful_trials > 0:
-        response_times = [trial.get('responseTime', 0) for trial in trial_data if trial.get('success') == 1]
-        # Sort response times and get median
+    # Calculate overall IES
+    def calculate_ies_for_trials(trials):
+        if not trials:
+            return 999999
+        
+        successful_trials = sum(1 for trial in trials if trial.get('success') == 1)
+        total_trials = len(trials)
+        safe_log('info', f"success: {successful_trials}")
+        safe_log('info', f"len: {total_trials}")
+        if successful_trials < 1:  # Need at least one successful trial
+            return 999999
+            
+        accuracy = successful_trials / total_trials
+
+        safe_log('info', f"Raw accuracy: {accuracy}")
+        # Get all response times for successful trials
+        response_times = [trial.get('responseTime', 0) for trial in trials if trial.get('success') == 1]
+        
+        # Log raw response times
+        safe_log('info', f"Raw response times: {response_times}")
+        
+        # Sort response times
         sorted_times = sorted(response_times)
+        
+        # Log sorted response times
+        safe_log('info', f"Sorted response times: {sorted_times}")
+        
         n = len(sorted_times)
+        
+        # Log number of sorted times
+        safe_log('info', f"Number of sorted times: {n}")
+        
         if n % 2 == 1:
             median_response_time = sorted_times[n // 2]
+            safe_log('info', f"Odd number of times, median: {median_response_time}")
         else:
             median_response_time = (sorted_times[n // 2 - 1] + sorted_times[n // 2]) / 2
-    else:
-        # If no successful trials, use all trials
-        response_times = [trial.get('responseTime', 0) for trial in trial_data]
-        sorted_times = sorted(response_times)
-        n = len(sorted_times)
-        if n % 2 == 1:
-            median_response_time = sorted_times[n // 2]
+            safe_log('info', f"Even number of times, median: {median_response_time}")
+        
+        ies = median_response_time / accuracy if accuracy > 0 else 999999
+        return round(ies, 2) if ies is not None else 999999
+    
+    # Split trials into time intervals
+    trials_by_interval = {
+        'IES1': [],  # First 60 seconds
+        'IES2': [],  # Second 60 seconds
+        'IES3': []   # Last 60 seconds
+    }
+    
+    # Sort trials by trial time
+    sorted_trials = sorted(trial_data, key=lambda x: x.get('trialTime', 0))
+    
+    # Calculate time intervals using game duration instead of last trial time
+    total_time = duration  # Use the game duration directly
+    interval_duration = total_time / 3
+    
+    for trial in sorted_trials:
+        trial_time = trial.get('trialTime', 0)
+        if trial_time < interval_duration:
+            trials_by_interval['IES1'].append(trial)
+        elif trial_time < 2 * interval_duration:
+            trials_by_interval['IES2'].append(trial)
         else:
-            median_response_time = (sorted_times[n // 2 - 1] + sorted_times[n // 2]) / 2
+            trials_by_interval['IES3'].append(trial)
     
-    # Calculate IES with smoothing
-    ies = median_response_time / accuracy if accuracy > 0 else 999999
+    # Calculate IES for each interval
+    ies1 = calculate_ies_for_trials(trials_by_interval['IES1'])
+    ies2 = calculate_ies_for_trials(trials_by_interval['IES2'])
+    ies3 = calculate_ies_for_trials(trials_by_interval['IES3'])
+
+    # Calculate overall IES only if all intervals have valid scores
+    if ies1 is None or ies2 is None or ies3 is None:
+        return None, None, None, None, 0, 0
+
+    # Calculate IES as the geometric mean of all 3 (to penalize inactive people)
+    overall_ies = round((ies1 * ies2 * ies3) ** (1/3), 2)
+
+    # Calculate additional informative scores
+    try:
+        # Calculate drift as the difference between first and last IES (in seconds)
+        # Positive value means improvement (became faster)
+        # Negative value means decline (became slower)
+        focus_drift = round(ies1 - ies3, 2)
+        
+        # Calculate mean of the three IES values
+        mean_ies = (ies1 + ies2 + ies3) / 3
+        
+        # Calculate AVEDEV (average deviation from mean)
+        # AVEDEV = (|IES1 - mean| + |IES2 - mean| + |IES3 - mean|) / 3
+        ave_dev = (abs(ies1 - mean_ies) + abs(ies2 - mean_ies) + abs(ies3 - mean_ies)) / 3
+        
+        # Convert to percentage of mean IES for better readability
+        # Lower AVEDEV means more consistent performance
+        focus_stability = round(100 * (1 - (ave_dev / mean_ies)))
+        
+        # Ensure stability is between 0 and 100
+        focus_stability = max(0, min(100, focus_stability))
+    except (ValueError, ZeroDivisionError):
+        # If any calculation fails, return 0
+        focus_drift = 0
+        focus_stability = 0
     
-    return round(ies, 2)  # Round to 2 decimal places for consistency
+    return overall_ies, ies1, ies2, ies3, focus_drift, focus_stability
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

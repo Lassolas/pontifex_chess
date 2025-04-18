@@ -173,7 +173,7 @@ class GameUI {
             case 'hard':
                 this.game.difficulty = 'Very Hard';
                 this.game.boardDisplayTime = 1;
-                this.game.duration = 180; // 3 minutes
+                this.game.duration = 30; // 3 minutes
                 this.game.saveResults = true;
                 this.isTrainingMode = false; // Clear training mode flag
                 break;
@@ -458,7 +458,6 @@ class GameUI {
         const successfulTrials = this.game.trialData.filter(trial => trial.success === 1).length;
         const successRate = ((successfulTrials / totalTrials) * 100).toFixed(1);
 
-    
         // Calculate average response time for successful trials (raw value, unrounded)
         const rawAverageRT = this.game.trialData
             .filter(trial => trial.success === 1)
@@ -471,23 +470,107 @@ class GameUI {
         // Display rounded values
         const averageRT = rawAverageRT.toFixed(2);
         const IES = rawIES.toFixed(2);
-        
+
+        // Get focus scores from game object
+        const focusDrift = this.game.focus_drift;
+        const focusStability = this.game.focus_stability;
+
+        // Determine color for focus drift
+        const driftColor = focusDrift > 15 ? 'darkgreen' :
+                         focusDrift >= -15 ? 'darkorange' : 'darkred';
+
+        // Determine color for focus stability
+        const stabilityColor = focusStability >= 80 ? 'darkgreen' :
+                             focusStability >= 60 ? 'darkorange' : 'darkred';
+
+        // Format focus stability with /100
+        const stabilityValue = focusStability ? `${focusStability}/100` : 'computing...';
+        const driftValue = focusDrift ? focusDrift : 'computing...';
+
         this.resultsSummary.innerHTML = `
             <p>Total Trials: ${totalTrials}</p>
-            <p>Successful Trials: ${successfulTrials}</p>
             <p>Success Rate: ${successRate}%</p>
             <p>Average Response Time: ${averageRT}s</p>
             <p>IES: ${IES} seconds</p>
+            <p style="color: ${driftColor || 'gray'}">Focus Drift: ${driftValue}</p>
+            <p style="color: ${stabilityColor || 'gray'}">Focus Stability: ${stabilityValue}</p>
         `;
 
         // Store IES for leaderboard comparison
         this.game.IES = IES;
 
         // Automatically submit results to server
-        this.submitResults(IES);
-        
+        this.submitResults();
     }
-    
+
+    submitResults() {
+        // Submit the trial data to get server-calculated IES values
+        fetch('/submit_results', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                patientName: this.patientName,
+                trialData: this.game.trialData,
+                difficulty: this.game.difficulty,
+                duration: this.game.duration,
+                boardDisplayTime: this.game.boardDisplayTime
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Store all IES values from server response
+                this.game.overall_ies = data.ies;  // Overall IES (geometric mean of IES1, IES2, IES3)
+                this.game.ies1 = data.ies1;
+                this.game.ies2 = data.ies2;
+                this.game.ies3 = data.ies3;
+                this.game.focus_drift = data.focus_drift;
+                this.game.focus_stability = data.focus_stability;
+                
+                // Update results display with server-calculated values
+                const totalTrials = this.game.trialData.length;
+                const successfulTrials = this.game.trialData.filter(trial => trial.success === 1).length;
+                const successRate = ((successfulTrials / totalTrials) * 100).toFixed(1);
+
+                // Calculate average response time for successful trials
+                const rawAverageRT = this.game.trialData
+                    .filter(trial => trial.success === 1)
+                    .reduce((sum, trial) => sum + trial.responseTime, 0) / successfulTrials;
+
+                // Display rounded values
+                const averageRT = rawAverageRT.toFixed(2);
+                const IES = this.game.overall_ies;  // Use the server-calculated overall IES
+
+                // Determine color for focus drift
+                const driftColor = this.game.focus_drift > 15 ? 'darkgreen' :
+                                 this.game.focus_drift >= -15 ? 'darkorange' : 'darkred';
+
+                // Determine color for focus stability
+                const stabilityColor = this.game.focus_stability >= 80 ? 'darkgreen' :
+                                     this.game.focus_stability >= 60 ? 'darkorange' : 'darkred';
+
+                // Format focus stability with /100
+                const stabilityValue = this.game.focus_stability ? `${this.game.focus_stability}/100` : 'computing...';
+                const driftValue = this.game.focus_drift ? this.game.focus_drift : 'computing...';
+
+                this.resultsSummary.innerHTML = `
+                    <p>Total Trials: ${totalTrials}</p>
+                    <p>Success Rate: ${successRate}%</p>
+                    <p>Average Response Time: ${averageRT}s</p>
+                    <p>IES: ${IES} seconds</p>
+                    <p style="color: ${driftColor || 'gray'}">Focus Drift: ${driftValue}</p>
+                    <p style="color: ${stabilityColor || 'gray'}">Focus Stability: ${stabilityValue}</p>
+                `;
+
+                // Update leaderboard after successful submission
+                this.fetchLeaderboard(true);  // Pass true to highlight current user
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
     restartGame() {
         // Clear the leaderboard display
         const leaderboardContainer = document.getElementById('leaderboard-container');
@@ -617,7 +700,9 @@ class GameUI {
             headerRow.innerHTML = `
                 <th>Rank</th>
                 <th>Name</th>
-                <th>Score</th>
+                <th>IES (s)</th>
+                <th>Drift (s)</th>
+                <th>Stability (%)</th>
             `;
             thead.appendChild(headerRow);
             table.appendChild(thead);
@@ -637,10 +722,22 @@ class GameUI {
                     row.className = 'highlight-current-user';
                 }
                 
+                // Determine colors for drift and stability
+                const driftColor = entry.drift > 15 ? 'darkgreen' :
+                                 entry.drift >= -15 ? 'darkorange' : 'darkred';
+                
+                const stabilityColor = entry.stability >= 80 ? 'darkgreen' :
+                                     entry.stability >= 60 ? 'darkorange' : 'darkred';
+                
+                // Format drift value with '+' for positive numbers
+                const driftDisplay = entry.drift >= 0 ? `+${entry.drift}` : entry.drift;
+                
                 row.innerHTML = `
                     <td>${index + 1}</td>
                     <td>${entry.name}</td>
                     <td>${entry.score}</td>
+                    <td style="color: ${driftColor}">${driftDisplay}</td>
+                    <td style="color: ${stabilityColor}">${entry.stability}/100</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -652,16 +749,29 @@ class GameUI {
                     const separator = document.createElement('tr');
                     separator.className = 'leaderboard-separator';
                     separator.innerHTML = `
-                        <td colspan="3">Your Score:</td>
+                        <td colspan="5">Your Score:</td>
                     `;
                     tbody.appendChild(separator);
 
                     const currentUserRow = document.createElement('tr');
                     currentUserRow.className = 'highlight-current-user';
+                    
+                    // Determine colors for drift and stability
+                    const driftColor = currentUserEntry.drift > 15 ? 'darkgreen' :
+                                     currentUserEntry.drift >= -15 ? 'darkorange' : 'darkred';
+                    
+                    const stabilityColor = currentUserEntry.stability >= 80 ? 'darkgreen' :
+                                         currentUserEntry.stability >= 60 ? 'darkorange' : 'darkred';
+                    
+                    // Format drift value with '+' for positive numbers
+                    const driftDisplay = currentUserEntry.drift >= 0 ? `+${currentUserEntry.drift}` : currentUserEntry.drift;
+                    
                     currentUserRow.innerHTML = `
                         <td>${entries.indexOf(currentUserEntry) + 1}</td>
                         <td>${currentUserEntry.name}</td>
                         <td>${currentUserEntry.score}</td>
+                        <td style="color: ${driftColor}">${driftDisplay}</td>
+                        <td style="color: ${stabilityColor}">${currentUserEntry.stability}/100</td>
                     `;
                     tbody.appendChild(currentUserRow);
                 }
@@ -675,74 +785,6 @@ class GameUI {
         // Hide loading text if element exists
         if (this.leaderboardLoading) {
             this.leaderboardLoading.textContent = '';
-        }
-    }
-
-    async submitResults(IES) {
-        // Skip submission for training mode
-        if (!this.game.saveResults) {
-            console.log('Training mode - results not saved');
-            // Show the leaderboard without highlight
-            this.fetchLeaderboard();
-            return;
-        }
-        
-        try {
-            // Show loading message
-            if (this.leaderboardLoading) {
-                this.leaderboardLoading.textContent = 'Uploading your score...';
-            }
-            
-            // Submit results
-            const response = await fetch('/submit_results', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    patientName: this.patientName,
-                    trialData: this.game.trialData,
-                    difficulty: this.game.difficulty,
-                    duration: this.game.duration,
-                    boardDisplayTime: this.game.boardDisplayTime,
-                    IES: IES
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                // Wait for leaderboard update to complete
-                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds for Google Sheets update
-                
-                // Fetch and display updated leaderboard with current user highlighted
-                await this.fetchLeaderboard(true);
-            } else {
-                console.error('Error submitting results:', data.message);
-                // Show error message
-                if (this.leaderboardLoading) {
-                    this.leaderboardLoading.textContent = 'Failed to upload score. Showing current leaderboard...';
-                    // Show current leaderboard without highlight
-                    await this.fetchLeaderboard();
-                    // Clear error message after showing leaderboard
-                    setTimeout(() => {
-                        this.leaderboardLoading.textContent = '';
-                    }, 1000);
-                }
-            }
-            
-        } catch (error) {
-            console.error('Error submitting results:', error);
-            // Show error message
-            if (this.leaderboardLoading) {
-                this.leaderboardLoading.textContent = 'Failed to upload score. Showing current leaderboard...';
-                // Show current leaderboard without highlight
-                await this.fetchLeaderboard();
-                // Clear error message after showing leaderboard
-                setTimeout(() => {
-                    this.leaderboardLoading.textContent = '';
-                }, 1000);
-            }
         }
     }
 
