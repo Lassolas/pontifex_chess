@@ -2,8 +2,10 @@ TODO LIST
 
 18/04/2025
 x update the training phase to give color feedback.
-o Mix the hard trial with simple ones to get a contrastive anlaysis, do performance decrease harder in hard task than easy ?  
-o Compensate for lack of trials (IES is only computed on succesful tries, if there is only one then its max)
-o Add a focus performance score. (constant focus vs decline) 
+x Add a focus performance score. (constant focus vs decline) 
 to motivate people to focus more despite being tired.
+x Compensate for lack of trials (IES is only computed on succesful tries, if there is only one then its max)
+o Mix the hard trial with simple ones to get a contrastive anlaysis, do performance decrease harder in hard task than easy ?  
+
+
 
