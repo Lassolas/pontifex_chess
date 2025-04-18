@@ -464,18 +464,18 @@ input[type="range"] {
 }
 
 .leaderboard-separator td {
-    background-color: #f10074;
+    background-color: #fba1ed;
     color: white;
 }
 
 .highlight-current-user {
-    background-color: #f10074;
+    background-color: #fba1ed;
     color: white;
     font-weight: bold;
 }
 
 .highlight-current-user td {
-    background-color: #f10074;
+    background-color: #fba1ed;
     color: white;
 }
 

@@ -482,18 +482,18 @@ class GameUI {
 
         // Determine color for focus stability
         const stabilityColor = focusStability >= 80 ? 'darkgreen' :
-                            focusStability >= 60 ? 'darkorange' : 'darkred';
+                            focusStability >= 60 ? 'darkgoldenrod' : 'darkred';
 
-        // Format focus stability with /100
-        const stabilityValue = focusStability ? `${focusStability}/100` : 'computing...';
+        // Format focus stability with %
+        const stabilityValue = focusStability ? `${focusStability}%` : 'computing...';
         const driftValue = focusDrift ? focusDrift : 'computing...';
 
         this.resultsSummary.innerHTML = `
             <p>Total Trials: ${totalTrials}</p>
             <p>Success Rate: ${successRate}%</p>
             <p>Average Response Time: ${averageRT}s</p>
-            <p>IES: ${IES} seconds</p>
-            <p style="color: ${driftColor || 'gray'}">Focus Drift: ${driftValue}</p>
+            <p>IES: ${IES_fixed} seconds</p>
+            <p style="color: ${driftColor || 'gray'}">Focus Drift: ${driftValue}s</p>
             <p style="color: ${stabilityColor || 'gray'}">Focus Stability: ${stabilityValue}</p>
         `;
 
@@ -543,22 +543,13 @@ class GameUI {
                 // Display rounded values
                 const averageRT = rawAverageRT.toFixed(2);
                 const IES = this.game.overall_ies;  // Use the server-calculated overall IES
-
+                const IES_fixed = IES.toFixed(2);
                 // Calculate drift threshold based on IES
                 const driftThreshold = 0.2 * IES; // 20% of IES
 
                 // Determine color for focus drift using IES-based threshold
                 const driftColor = this.game.focus_drift > driftThreshold ? 'darkgreen' :
                                 this.game.focus_drift >= -driftThreshold ? 'darkgoldenrod' : 'darkred';
-                // After calculating drift color
-                console.log('Drift Analysis:', {
-                    focus_drift: this.game.focus_drift,
-                    IES: IES,
-                    driftThreshold: driftThreshold,
-                    driftColor: driftColor,
-                    driftCategory: this.game.focus_drift > driftThreshold ? 'High (Green)' :
-                    this.game.focus_drift >= -driftThreshold ? 'Medium (Yellow)' : 'Low (Red)'
-                });
 
                 // Add this logging after the submitResults call
                 console.log('All Drift Values:', {
@@ -572,18 +563,18 @@ class GameUI {
 
                 // Determine color for focus stability
                 const stabilityColor = this.game.focus_stability >= 80 ? 'darkgreen' :
-                                    this.game.focus_stability >= 60 ? 'darkorange' : 'darkred';
-
-                // Format focus stability with /100
-                const stabilityValue = this.game.focus_stability ? `${this.game.focus_stability}/100` : 'computing...';
+                                    this.game.focus_stability >= 60 ? 'darkgoldenrod' : 'darkred';
+                
+                // Format focus stability with %
+                const stabilityValue = this.game.focus_stability ? `${this.game.focus_stability}%` : 'computing...';
                 const driftValue = this.game.focus_drift ? this.game.focus_drift : 'computing...';
 
                 this.resultsSummary.innerHTML = `
                     <p>Total Trials: ${totalTrials}</p>
                     <p>Success Rate: ${successRate}%</p>
                     <p>Average Response Time: ${averageRT}s</p>
-                    <p>IES: ${IES} seconds</p>
-                    <p style="color: ${driftColor || 'gray'}">Focus Drift: ${driftValue}</p>
+                    <p>IES: ${IES_fixed} seconds</p>
+                    <p style="color: ${driftColor || 'gray'}">Focus Drift: ${driftValue}s</p>
                     <p style="color: ${stabilityColor || 'gray'}">Focus Stability: ${stabilityValue}</p>
                 `;
 
@@ -703,7 +694,7 @@ class GameUI {
         leaderboardContainer.innerHTML = '';
 
         // Create leaderboard columns
-        const difficulties = ['easy', 'medium', 'hard'];
+        const difficulties = ['hard', 'medium', 'easy'];
         difficulties.forEach(difficulty => {
             const column = document.createElement('div');
             column.className = 'leaderboard-column';
@@ -749,12 +740,16 @@ class GameUI {
                     row.className = 'highlight-current-user';
                 }
                 
+                // Calculate drift threshold based on IES (using entry's IES value if available)
+                const IES = entry.score; // Fallback to 1000 if IES is not available
+                const driftThreshold = 0.2 * IES; // 20% of IES
+
                 // Determine colors for drift and stability
-                const driftColor = entry.drift > 15 ? 'darkgreen' :
-                                 entry.drift >= -15 ? 'darkorange' : 'darkred';
-                
+                const driftColor = entry.drift > driftThreshold ? 'darkgreen' :
+                                    entry.drift >= -driftThreshold ? 'darkgoldenrod' : 'darkred';
+
                 const stabilityColor = entry.stability >= 80 ? 'darkgreen' :
-                                     entry.stability >= 60 ? 'darkorange' : 'darkred';
+                                    entry.stability >= 60 ? 'darkgoldenrod' : 'darkred';
                 
                 // Format drift value with '+' for positive numbers
                 const driftDisplay = entry.drift >= 0 ? `+${entry.drift}` : entry.drift;
@@ -764,7 +759,7 @@ class GameUI {
                     <td>${entry.name}</td>
                     <td>${entry.score}</td>
                     <td style="color: ${driftColor}">${driftDisplay}</td>
-                    <td style="color: ${stabilityColor}">${entry.stability}/100</td>
+                    <td style="color: ${stabilityColor}">${entry.stability}%</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -783,12 +778,16 @@ class GameUI {
                     const currentUserRow = document.createElement('tr');
                     currentUserRow.className = 'highlight-current-user';
                     
+                    // Calculate drift threshold based on IES (using entry's IES value if available)
+                    const IES = entry.ies || 1000; // Fallback to 1000 if IES is not available
+                    const driftThreshold = 0.2 * IES; // 20% of IES
+    
                     // Determine colors for drift and stability
-                    const driftColor = currentUserEntry.drift > 15 ? 'darkgreen' :
-                                     currentUserEntry.drift >= -15 ? 'darkorange' : 'darkred';
-                    
-                    const stabilityColor = currentUserEntry.stability >= 80 ? 'darkgreen' :
-                                         currentUserEntry.stability >= 60 ? 'darkorange' : 'darkred';
+                    const driftColor = entry.drift > driftThreshold ? 'darkgreen' :
+                                        entry.drift >= -driftThreshold ? 'darkgoldenrod' : 'darkred';
+    
+                    const stabilityColor = entry.stability >= 80 ? 'darkgreen' :
+                                        entry.stability >= 60 ? 'darkgoldenrod' : 'darkred';
                     
                     // Format drift value with '+' for positive numbers
                     const driftDisplay = currentUserEntry.drift >= 0 ? `+${currentUserEntry.drift}` : currentUserEntry.drift;
@@ -798,7 +797,7 @@ class GameUI {
                         <td>${currentUserEntry.name}</td>
                         <td>${currentUserEntry.score}</td>
                         <td style="color: ${driftColor}">${driftDisplay}</td>
-                        <td style="color: ${stabilityColor}">${currentUserEntry.stability}/100</td>
+                        <td style="color: ${stabilityColor}">${currentUserEntry.stability}%</td>
                     `;
                     tbody.appendChild(currentUserRow);
                 }
