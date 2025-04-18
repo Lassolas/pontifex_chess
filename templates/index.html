@@ -20,13 +20,18 @@
     <!-- Intro Screen -->
     <div id="intro-screen" class="screen" style="display: none;">
         <h1>Chess Attack Recognition Task</h1>
-        <p class="intro-text">Select a test mode to begin:</p>
+        <div class="description-container">
+            <p class="description-left">You will be presented with a chess position, then shown a white attacking piece.</p>
+            <p class="description-left">Your task is to find the square of an attacked black piece.</p>
+            <p class="description-center">Be fast, be good, be focused.</p>
+        </div>
+        <p class="intro-text">Select a mode to begin:</p>
         
         <div class="mode-buttons">
             <button id="training-btn" class="mode-btn">
                 <h2>Training</h2>
                 <p>Difficulty: Easy</p>
-                <p>Board Display: 5s</p>
+                <p>Hide Time: 5s</p>
                 <p>Duration: 1 min</p>
                 <p class="note">Results not saved</p>
             </button>
@@ -34,22 +39,22 @@
             <button id="easy-btn" class="mode-btn">
                 <h2>Easy</h2>
                 <p>Difficulty: Easy</p>
-                <p>Board Display: 5s</p>
+                <p>Hide Time: 5s</p>
                 <p>Duration: 3 min</p>
                 <p class="note">Results saved</p>
             </button>
             
             <button id="medium-btn" class="mode-btn">
                 <h2>Medium</h2>
-                <p>Difficulty: Hard</p>
-                <p>Board Display: 3s</p>
+                <p>Difficulty: Medium</p>
+                <p>Hide Time: 3s</p>
                 <p>Duration: 3 min</p>
                 <p class="note">Results saved</p>
             </button>
             
             <button id="hard-btn" class="mode-btn">
                 <h2>Hard</h2>
-                <p>Difficulty: Very Hard</p>
+                <p>Difficulty: Hard</p>
                 <p>Board Display: 1s</p>
                 <p>Duration: 3 min</p>
                 <p class="note">Results saved</p>
@@ -70,7 +75,6 @@
         </div>
         <div class="game-container">
             <div id="attacking-piece" class="attacking-piece"></div>
-            <div id="instruction-text" class="instruction-text"></div>
             <div id="chessboard" class="chessboard"></div>
         </div>
     </div>

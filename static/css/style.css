@@ -298,6 +298,11 @@ input[type="range"] {
     justify-content: center;
     align-items: center;
     position: relative;
+    transition: all 0.3s ease;
+    position: relative;
+    opacity: 1 !important;
+    z-index: 1 !important;
+    transition: all 0.3s ease !important;
 }
 
 .square.white {
@@ -318,6 +323,10 @@ input[type="range"] {
     display: flex;
     justify-content: center;
     align-items: center;
+    position: relative;
+    z-index: 2 !important;
+    opacity: 1 !important;
+    transition: opacity 0.3s ease !important;
 }
 
 .piece svg {
@@ -442,18 +451,32 @@ input[type="range"] {
 
 /* Loading State */
 #leaderboard-loading {
+    font-size: 1.2rem;
+    margin: 1rem 0;
     text-align: center;
-    padding: 20px;
-    font-style: italic;
     color: #666;
 }
 
 .leaderboard-separator {
-    text-align: center;
-    background-color: #f2f2f2;
+    background-color: #f10074;
+    color: white;
     font-weight: bold;
-    color: #666;
-    height: 30px;
+}
+
+.leaderboard-separator td {
+    background-color: #f10074;
+    color: white;
+}
+
+.highlight-current-user {
+    background-color: #f10074;
+    color: white;
+    font-weight: bold;
+}
+
+.highlight-current-user td {
+    background-color: #f10074;
+    color: white;
 }
 
 .results-buttons {
@@ -575,7 +598,7 @@ input[type="range"] {
 
 .mode-btn {
     width: 220px;
-    height: 280px;
+    height: 230px;
     padding: 20px;
     border: 2px solid #ccc;
     border-radius: 10px;
@@ -628,4 +651,158 @@ input[type="range"] {
 #hard-btn {
     background-color: #ffebee;
     border-color: #e57373;
+}
+
+/* Normal mode click highlight */
+.normal-click {
+    background-color: #f6f669 !important;
+    opacity: 0.6 !important;
+    transition: background-color 0.01s ease !important;
+    z-index: 1000 !important;
+    position: relative !important;
+    box-shadow: 0 0 2px #f6f669 !important;
+}
+
+/* Ensure normal mode highlight is preserved */
+.square.normal-click {
+    background-color: #f6f669 !important;
+    opacity: 0.6 !important;
+    transition: background-color 0.01s ease !important;
+    z-index: 1000 !important;
+    position: relative !important;
+    box-shadow: 0 0 2px #f6f669 !important;
+}
+
+/* Training Feedback Styles */
+.square.success {
+    background-color: #acffae !important;
+    opacity: 1 !important;
+    transition: background-color 0.05s ease !important;
+    z-index: 1000 !important;
+    position: relative !important;
+    box-shadow: 0 0 5px #ffffff !important;
+}
+
+.square.failure {
+    background-color: #ff7c7c !important;
+    opacity: 1 !important;
+    transition: background-color 0.05s ease !important;
+    z-index: 1000 !important;
+    position: relative !important;
+    box-shadow: 0 0 5px #ffffff !important;
+}
+
+/* Debug classes */
+.debug-success {
+    border: 4px solid #acffae !important;
+    box-shadow: 0 0 10px #69ff6e !important;
+    position: relative !important;
+    z-index: 1001 !important;
+    opacity: 1 !important;
+}
+
+.debug-failure {
+    border: 4px solid #ff7c7c !important;
+    box-shadow: 0 0 10px #ffffff !important;
+    position: relative !important;
+    z-index: 1001 !important;
+    opacity: 1 !important;
+}
+
+/* Training Mode Styles */
+.training-mode .chessboard {
+    opacity: 1 !important;
+    transition: opacity 0.3s ease !important;
+}
+
+/* Ensure pieces are visible during training mode */
+.training-mode .piece {
+    opacity: 1 !important;
+    transition: opacity 0.3s ease !important;
+}
+
+/* Ensure feedback classes are applied correctly */
+.square.success,
+.square.failure {
+    position: relative;
+    z-index: 1000;
+}
+
+.description-container {
+    margin: 1.5rem 0;
+    padding: 1.5rem;
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.description-left {
+    font-size: 1.2em;
+    color: #333;
+    margin: 0.5rem 0;
+    text-align: left;
+    line-height: 1.5;
+}
+
+.description-center {
+    font-size: 1.2em;
+    color: #333;
+    margin: 1rem 0;
+    text-align: center;
+    font-weight: bold;
+    line-height: 1.5;
+}
+
+/* Training Screen Styles */
+.training-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(5px);
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 2rem;
+}
+
+.trial-number {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #333;
+}
+
+/* Stop Training Button Styles */
+.stop-button {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    background-color: #ff4444;
+    color: white;
+    border: 2px solid #cc0000;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-size: 1.1em;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 1000;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.stop-button:hover {
+    background-color: #cc0000;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.training-content {
+    padding: 0 2rem;
+    text-align: center;
+}
+
+#training-message {
+    margin: 1rem 0;
+    font-size: 1.2em;
+    color: #333;
 }
