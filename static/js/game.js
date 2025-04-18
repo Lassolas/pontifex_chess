@@ -157,7 +157,7 @@ class GameUI {
                 this.isTrainingMode = true; // Set training mode flag
                 break;
             case 'easy':
-                this.game.difficulty = 'Easy';
+                this.game.difficulty = 'Medium';
                 this.game.boardDisplayTime = 5;
                 this.game.duration = 180; // 3 minutes
                 this.game.saveResults = true;
@@ -166,7 +166,7 @@ class GameUI {
             case 'medium':
                 this.game.difficulty = 'Hard';
                 this.game.boardDisplayTime = 3;
-                this.game.duration = 180; // 3 minutes
+                this.game.duration= 180; // 3 minutes
                 this.game.saveResults = true;
                 this.isTrainingMode = false; // Clear training mode flag
                 break;
