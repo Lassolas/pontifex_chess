@@ -166,7 +166,7 @@ class GameUI {
             case 'medium':
                 this.game.difficulty = 'Hard';
                 this.game.boardDisplayTime = 3;
-                this.game.duration= 180; // 3 minutes
+                this.game.duration= 30; // 3 minutes
                 this.game.saveResults = true;
                 this.isTrainingMode = false; // Clear training mode flag
                 break;
@@ -465,23 +465,24 @@ class GameUI {
 
         // Calculate IES using unrounded averageRT
         const accuracy = successfulTrials / totalTrials || 1; // Avoid division by zero
-        const rawIES = rawAverageRT / accuracy;
+        const IES = this.game.overall_ies || (rawAverageRT / accuracy);
+        const IES_fixed = IES.toFixed(2);
 
         // Display rounded values
         const averageRT = rawAverageRT.toFixed(2);
-        const IES = rawIES.toFixed(2);
 
         // Get focus scores from game object
         const focusDrift = this.game.focus_drift;
         const focusStability = this.game.focus_stability;
 
-        // Determine color for focus drift
-        const driftColor = focusDrift > 15 ? 'darkgreen' :
-                         focusDrift >= -15 ? 'darkorange' : 'darkred';
+        // Determine color for focus drift using IES-based threshold
+        const driftThreshold = 0.2 * IES; // 20% of IES
+        const driftColor = focusDrift > driftThreshold ? 'darkgreen' :
+                        focusDrift >= -driftThreshold ? 'darkgoldenrod' : 'darkred';
 
         // Determine color for focus stability
         const stabilityColor = focusStability >= 80 ? 'darkgreen' :
-                             focusStability >= 60 ? 'darkorange' : 'darkred';
+                            focusStability >= 60 ? 'darkorange' : 'darkred';
 
         // Format focus stability with /100
         const stabilityValue = focusStability ? `${focusStability}/100` : 'computing...';
@@ -543,13 +544,35 @@ class GameUI {
                 const averageRT = rawAverageRT.toFixed(2);
                 const IES = this.game.overall_ies;  // Use the server-calculated overall IES
 
-                // Determine color for focus drift
-                const driftColor = this.game.focus_drift > 15 ? 'darkgreen' :
-                                 this.game.focus_drift >= -15 ? 'darkorange' : 'darkred';
+                // Calculate drift threshold based on IES
+                const driftThreshold = 0.2 * IES; // 20% of IES
+
+                // Determine color for focus drift using IES-based threshold
+                const driftColor = this.game.focus_drift > driftThreshold ? 'darkgreen' :
+                                this.game.focus_drift >= -driftThreshold ? 'darkgoldenrod' : 'darkred';
+                // After calculating drift color
+                console.log('Drift Analysis:', {
+                    focus_drift: this.game.focus_drift,
+                    IES: IES,
+                    driftThreshold: driftThreshold,
+                    driftColor: driftColor,
+                    driftCategory: this.game.focus_drift > driftThreshold ? 'High (Green)' :
+                    this.game.focus_drift >= -driftThreshold ? 'Medium (Yellow)' : 'Low (Red)'
+                });
+
+                // Add this logging after the submitResults call
+                console.log('All Drift Values:', {
+                    driftValues: this.game.trialData.map(trial => ({
+                        trial: trial.trialNumber,
+                        drift: trial.focus_drift,
+                        responseTime: trial.responseTime,
+                        success: trial.success
+                    }))
+                });
 
                 // Determine color for focus stability
                 const stabilityColor = this.game.focus_stability >= 80 ? 'darkgreen' :
-                                     this.game.focus_stability >= 60 ? 'darkorange' : 'darkred';
+                                    this.game.focus_stability >= 60 ? 'darkorange' : 'darkred';
 
                 // Format focus stability with /100
                 const stabilityValue = this.game.focus_stability ? `${this.game.focus_stability}/100` : 'computing...';
@@ -710,8 +733,12 @@ class GameUI {
             // Add table body
             const tbody = document.createElement('tbody');
 
-            // Get entries for this difficulty
-            const entries = leaderboardData[difficulty] || [];
+            // Get entries for this difficulty - use case-insensitive comparison
+            const entries = (leaderboardData[difficulty.toLowerCase()] || 
+                            leaderboardData[difficulty.toUpperCase()] || 
+                            leaderboardData[difficulty.charAt(0).toUpperCase() + difficulty.slice(1)] || 
+                            [])
+                            .sort((a, b) => parseFloat(a.score) - parseFloat(b.score));
             
             // Add top 10 entries with highlighting for current user
             entries.slice(0, 10).forEach((entry, index) => {

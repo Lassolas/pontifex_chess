@@ -169,7 +169,7 @@ def update_leaderboard(service, current_user=None, current_difficulty=None, curr
             except Exception as e:
                 safe_log('warning', f"Skipping sheet {sheet_name} due to missing or invalid data: {e}")
                 continue
-
+            
         # Sort each difficulty group by IES (ascending)
         easy_entries = sorted(easy_entries, key=lambda x: float(x[1]))
         medium_entries = sorted(medium_entries, key=lambda x: float(x[1]))
@@ -182,7 +182,7 @@ def update_leaderboard(service, current_user=None, current_difficulty=None, curr
 
         # Prepare the leaderboard data with headers for Google Sheets
         leaderboard_data = [
-            ["Easy Difficulty", "", "", "", "", "Medium Difficulty", "", "", "", "Hard Difficulty", "", "", ""],
+            ["Easy Difficulty", "", "", "", "", "Medium Difficulty", "", "", "", "", "Hard Difficulty", "", "", ""],
             ["Rank", "Name", "IES (s)", "Drift", "Stability", 
              "Rank", "Name", "IES (s)", "Drift", "Stability", 
              "Rank", "Name", "IES (s)", "Drift", "Stability"]
@@ -280,15 +280,11 @@ def get_leaderboard():
             range="Leaderboard!A1:O1000"
         ).execute()
         
-        leaderboard_data = result.get('values', [])
-        safe_log('info', f"Raw leaderboard data rows: {len(leaderboard_data)}")
-        
+        leaderboard_data = result.get('values', [])        
         # Format the data for frontend display
         formatted_data = format_leaderboard_data(leaderboard_data)
-        safe_log('info', f"Formatted leaderboard data: {formatted_data}")
-        
+
         response = jsonify({"success": True, "leaderboard": formatted_data})
-        safe_log('info', "Leaderboard response prepared")
         return response
     
     except Exception as e:
@@ -299,7 +295,6 @@ def get_leaderboard():
 def submit_results():
     try:
         data = request.json
-        safe_log('debug', f"Received submission data: {data}")
         
         patient_name = data.get('patientName')
         trial_data = data.get('trialData')
@@ -309,16 +304,19 @@ def submit_results():
         # Check both possible field names (for backward compatibility)
         board_display_time = data.get('boardDisplayTime')
         if board_display_time is None:
-            board_display_time = data.get('hideTime')  # Use the old name as fallback
-            
-        safe_log('info', f"Board display time from request: {board_display_time} seconds")
+            board_display_time = data.get('hideTime')  # Use the old name as fallback        
 
         # Map difficulty to display names if needed
-        display_difficulty = "Easy"  # Default
-        if difficulty.lower() == "hard":
+        
+        
+        if difficulty.lower() == "medium":
+            display_difficulty = "Easy"
+        elif difficulty.lower() == "hard":
             display_difficulty = "Medium"
         elif difficulty.lower() == "very hard":
             display_difficulty = "Hard"
+        else:
+            display_difficulty = "Easy"
 
         # Validate required fields
         if not all([patient_name, trial_data, difficulty, board_display_time]):
@@ -447,59 +445,49 @@ def submit_results():
         return jsonify({"success": False, "message": "Error submitting results"}), 500
         
 def format_leaderboard_data(leaderboard_data):
-    safe_log('info', f"Formatting leaderboard data with {len(leaderboard_data)} rows")
-    
-    if len(leaderboard_data) <= 1:  # Only header or empty
+    if len(leaderboard_data) <= 2:  # Only header rows or empty
         safe_log('warning', "Leaderboard data has only headers or is empty")
         return {"easy": [], "medium": [], "hard": []}
-        
+
     formatted_data = {
         'easy': [],
         'medium': [],
         'hard': []
     }
-    
-    for i, row in enumerate(leaderboard_data[1:]):  # Skip header row
+
+    for i, row in enumerate(leaderboard_data[2:]):  # Skip first two header rows
         try:
-            # Skip header rows
-            if len(row) >= 15 and row[0] != "Rank" and row[6] != "Rank" and row[12] != "Rank":
-                # Remove empty cells at the start
-                while row and not row[0]:
-                    row = row[1:]
-                
-                # Check if we have enough data after removing empty cells
-                if len(row) >= 5:  # Minimum for easy column
-                    # Easy column
-                    if row[0] != "Rank" and row[1] and row[1] != "Name":
-                        formatted_data['easy'].append({
-                            'rank': row[0],
-                            'name': row[1],
-                            'score': row[2],
-                            'drift': row[3],
-                            'stability': row[4]
-                        })
-                    # Medium column
-                    if len(row) >= 10 and row[5] != "Rank" and row[6] and row[6] != "Name":
-                        formatted_data['medium'].append({
-                            'rank': row[5],
-                            'name': row[6],
-                            'score': row[7],
-                            'drift': row[8],
-                            'stability': row[9]
-                        })
-                    # Hard column
-                    if len(row) >= 15 and row[10] != "Rank" and row[11] and row[11] != "Name":
-                        formatted_data['hard'].append({
-                            'rank': row[10],
-                            'name': row[11],
-                            'score': row[12],
-                            'drift': row[13],
-                            'stability': row[14]
-                        })
-        except (IndexError, ValueError) as e:
-            safe_log('warning', f"Skipping invalid leaderboard row {i+1}: {row}, error: {str(e)}")
-            continue  # Skip to next row if there's an error
-    
+            # Easy
+            if len(row) >= 5 and row[0] and row[0] != "Rank":
+                formatted_data['easy'].append({
+                    'rank': row[0],
+                    'name': row[1],
+                    'score': row[2],
+                    'drift': row[3],
+                    'stability': row[4]
+                })
+            # Medium
+            if len(row) >= 10 and row[5] and row[5] != "Rank":
+                formatted_data['medium'].append({
+                    'rank': row[5],
+                    'name': row[6],
+                    'score': row[7],
+                    'drift': row[8],
+                    'stability': row[9]
+                })
+            # Hard
+            if len(row) >= 15 and row[10] and row[10] != "Rank":
+                formatted_data['hard'].append({
+                    'rank': row[10],
+                    'name': row[11],
+                    'score': row[12],
+                    'drift': row[13],
+                    'stability': row[14]
+                })
+        except Exception as e:
+            safe_log('warning', f"Skipping invalid leaderboard row {i+3}: {row}, error: {str(e)}")
+            continue
+
     safe_log('info', f"Formatted leaderboard entries - Easy: {len(formatted_data['easy'])}, Medium: {len(formatted_data['medium'])}, Hard: {len(formatted_data['hard'])}")
     return formatted_data
 
@@ -538,37 +526,23 @@ def calculate_ies(trial_data, duration):
         
         successful_trials = sum(1 for trial in trials if trial.get('success') == 1)
         total_trials = len(trials)
-        safe_log('info', f"success: {successful_trials}")
-        safe_log('info', f"len: {total_trials}")
         if successful_trials < 1:  # Need at least one successful trial
             return 999999
             
         accuracy = successful_trials / total_trials
 
-        safe_log('info', f"Raw accuracy: {accuracy}")
         # Get all response times for successful trials
         response_times = [trial.get('responseTime', 0) for trial in trials if trial.get('success') == 1]
-        
-        # Log raw response times
-        safe_log('info', f"Raw response times: {response_times}")
         
         # Sort response times
         sorted_times = sorted(response_times)
         
-        # Log sorted response times
-        safe_log('info', f"Sorted response times: {sorted_times}")
-        
         n = len(sorted_times)
-        
-        # Log number of sorted times
-        safe_log('info', f"Number of sorted times: {n}")
         
         if n % 2 == 1:
             median_response_time = sorted_times[n // 2]
-            safe_log('info', f"Odd number of times, median: {median_response_time}")
         else:
             median_response_time = (sorted_times[n // 2 - 1] + sorted_times[n // 2]) / 2
-            safe_log('info', f"Even number of times, median: {median_response_time}")
         
         ies = median_response_time / accuracy if accuracy > 0 else 999999
         return round(ies, 2) if ies is not None else 999999

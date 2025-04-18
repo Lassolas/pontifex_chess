@@ -6,6 +6,6 @@ x Add a focus performance score. (constant focus vs decline)
 to motivate people to focus more despite being tired.
 x Compensate for lack of trials (IES is only computed on succesful tries, if there is only one then its max)
 o Mix the hard trial with simple ones to get a contrastive anlaysis, do performance decrease harder in hard task than easy ?  
-
-
+o combine multiple score from the same account
+o avoid adding sheet, replace with smart management of the google sheet
 
