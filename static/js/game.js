@@ -485,16 +485,16 @@ class GameUI {
                             focusStability >= 60 ? 'darkgoldenrod' : 'darkred';
 
         // Format focus stability with %
-        const stabilityValue = focusStability ? `${focusStability}%` : 'computing...';
-        const driftValue = focusDrift ? focusDrift : 'computing...';
+        const stabilityValue = this.isTrainingMode ? 'only in test mode' : (focusStability ? `${focusStability}%` : 'computing...');
+        const driftValue = this.isTrainingMode ? 'only in test mode' : (focusDrift ? focusDrift : 'computing...');
 
         this.resultsSummary.innerHTML = `
             <p>Total Trials: ${totalTrials}</p>
             <p>Success Rate: ${successRate}%</p>
             <p>Average Response Time: ${averageRT}s</p>
             <p>IES: ${IES_fixed} seconds</p>
-            <p style="color: ${driftColor || 'gray'}">Focus Drift: ${driftValue}s</p>
-            <p style="color: ${stabilityColor || 'gray'}">Focus Stability: ${stabilityValue}</p>
+            ${driftValue ? `<p style="color: ${driftColor || 'gray'}">Focus Drift: ${driftValue}s</p>` : ''}
+            ${stabilityValue ? `<p style="color: ${stabilityColor || 'gray'}">Focus Stability: ${stabilityValue}</p>` : ''}
         `;
 
         // Store IES for leaderboard comparison
@@ -505,6 +505,12 @@ class GameUI {
     }
 
     submitResults() {
+        // Skip data submission in training mode
+        if (this.isTrainingMode) {
+            console.log('Skipping data submission - in training mode');
+            return;
+        }
+
         // Submit the trial data to get server-calculated IES values
         fetch('/submit_results', {
             method: 'POST',
@@ -566,16 +572,16 @@ class GameUI {
                                     this.game.focus_stability >= 60 ? 'darkgoldenrod' : 'darkred';
                 
                 // Format focus stability with %
-                const stabilityValue = this.game.focus_stability ? `${this.game.focus_stability}%` : 'computing...';
-                const driftValue = this.game.focus_drift ? this.game.focus_drift : 'computing...';
+                const stabilityValue = this.isTrainingMode ? 'only in test mode' : (this.game.focus_stability ? `${this.game.focus_stability}%` : 'computing...');
+                const driftValue = this.isTrainingMode ? 'only in test mode' : (this.game.focus_drift ? this.game.focus_drift : 'computing...');
 
                 this.resultsSummary.innerHTML = `
                     <p>Total Trials: ${totalTrials}</p>
                     <p>Success Rate: ${successRate}%</p>
                     <p>Average Response Time: ${averageRT}s</p>
                     <p>IES: ${IES_fixed} seconds</p>
-                    <p style="color: ${driftColor || 'gray'}">Focus Drift: ${driftValue}s</p>
-                    <p style="color: ${stabilityColor || 'gray'}">Focus Stability: ${stabilityValue}</p>
+                    ${driftValue ? `<p style="color: ${driftColor || 'gray'}">Focus Drift: ${driftValue}s</p>` : ''}
+                    ${stabilityValue ? `<p style="color: ${stabilityColor || 'gray'}">Focus Stability: ${stabilityValue}</p>` : ''}
                 `;
 
                 // Update leaderboard after successful submission
