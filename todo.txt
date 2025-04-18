@@ -6,3 +6,4 @@ o Mix the hard trial with simple ones to get a contrastive anlaysis, do performa
 o Compensate for lack of trials (IES is only computed on succesful tries, if there is only one then its max)
 o Add a focus performance score. (constant focus vs decline) 
 to motivate people to focus more despite being tired.
+

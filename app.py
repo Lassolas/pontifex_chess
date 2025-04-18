@@ -432,7 +432,11 @@ def format_leaderboard_data(leaderboard_data):
 def calculate_ies(trial_data):
     """
     Calculate Inverse Efficiency Score (IES) from trial data.
-    IES = mean response time / accuracy
+    IES = median response time / accuracy
+    
+    Includes:
+    - Minimum trial threshold (require at least 5 successful trials)
+    - Smoothing factor to prevent explosion when accuracy approaches 0
     """
     if not trial_data:
         return 999999
@@ -440,22 +444,38 @@ def calculate_ies(trial_data):
     # Calculate accuracy (proportion of successful trials)
     total_trials = len(trial_data)
     successful_trials = sum(1 for trial in trial_data if trial.get('success') == 1)
-    accuracy = successful_trials / total_trials if total_trials > 0 else 1  # Avoid division by zero
     
-    # Calculate mean response time for successful trials
+    # Check minimum trial threshold
+    if successful_trials < 5:
+        return 999999  # Return None to indicate insufficient trials
+    
+    # Calculate accuracy 
+    accuracy = successful_trials / total_trials if total_trials > 0 else 0  # Avoid division by zero
+    
+    # Calculate median response time for successful trials
     if successful_trials > 0:
         response_times = [trial.get('responseTime', 0) for trial in trial_data if trial.get('success') == 1]
-        mean_response_time = sum(response_times) / len(response_times)
+        # Sort response times and get median
+        sorted_times = sorted(response_times)
+        n = len(sorted_times)
+        if n % 2 == 1:
+            median_response_time = sorted_times[n // 2]
+        else:
+            median_response_time = (sorted_times[n // 2 - 1] + sorted_times[n // 2]) / 2
     else:
         # If no successful trials, use all trials
         response_times = [trial.get('responseTime', 0) for trial in trial_data]
-        mean_response_time = sum(response_times) / len(response_times) if response_times else 0
+        sorted_times = sorted(response_times)
+        n = len(sorted_times)
+        if n % 2 == 1:
+            median_response_time = sorted_times[n // 2]
+        else:
+            median_response_time = (sorted_times[n // 2 - 1] + sorted_times[n // 2]) / 2
     
-    # Calculate IES
-    ies = mean_response_time / accuracy if accuracy > 0 else float('inf')
+    # Calculate IES with smoothing
+    ies = median_response_time / accuracy if accuracy > 0 else 999999
     
-    # Round to 2 decimal places
-    return round(ies, 2)
+    return round(ies, 2)  # Round to 2 decimal places for consistency
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
