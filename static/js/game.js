@@ -166,14 +166,14 @@ class GameUI {
             case 'medium':
                 this.game.difficulty = 'Hard';
                 this.game.boardDisplayTime = 3;
-                this.game.duration= 30; // 3 minutes
+                this.game.duration= 180; // 3 minutes
                 this.game.saveResults = true;
                 this.isTrainingMode = false; // Clear training mode flag
                 break;
             case 'hard':
                 this.game.difficulty = 'Very Hard';
                 this.game.boardDisplayTime = 1;
-                this.game.duration = 30; // 3 minutes
+                this.game.duration = 180; // 3 minutes
                 this.game.saveResults = true;
                 this.isTrainingMode = false; // Clear training mode flag
                 break;
