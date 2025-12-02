@@ -457,37 +457,32 @@ def format_leaderboard_data(leaderboard_data):
 
     for i, row in enumerate(leaderboard_data[2:]):  # Skip first two header rows
         try:
-            # Easy
-            if len(row) >= 5 and row[0] and row[0] != "Rank":
-                formatted_data['easy'].append({
-                    'rank': row[0],
-                    'name': row[1],
-                    'score': row[2],
-                    'drift': row[3],
-                    'stability': row[4]
-                })
-            # Medium
-            if len(row) >= 10 and row[5] and row[5] != "Rank":
-                formatted_data['medium'].append({
-                    'rank': row[5],
-                    'name': row[6],
-                    'score': row[7],
-                    'drift': row[8],
-                    'stability': row[9]
-                })
-            # Hard
-            if len(row) >= 15 and row[10] and row[10] != "Rank":
-                formatted_data['hard'].append({
-                    'rank': row[10],
-                    'name': row[11],
-                    'score': row[12],
-                    'drift': row[13],
-                    'stability': row[14]
-                })
-        except Exception as e:
-            safe_log('warning', f"Skipping invalid leaderboard row {i+3}: {row}, error: {str(e)}")
-            continue
-
+            # Skip header rows
+            if len(row) >= 9 and row[0] != "Rank" and row[3] != "Rank" and row[6] != "Rank":
+                # Easy column
+                if row[1] and row[1] != "Name":
+                    formatted_data['easy'].append({
+                        'rank': row[0],
+                        'name': row[1],
+                        'score': row[2]
+                    })
+                # Medium column
+                if row[4] and row[4] != "Name":
+                    formatted_data['medium'].append({
+                        'rank': row[3],
+                        'name': row[4],
+                        'score': row[5]
+                    })
+                # Hard column
+                if row[7] and row[7] != "Name":
+                    formatted_data['hard'].append({
+                        'rank': row[6],
+                        'name': row[7],
+                        'score': row[8]
+                    })
+        except (IndexError, ValueError) as e:
+            safe_log('warning', f"Skipping invalid leaderboard row {i+1}: {row}, error: {str(e)}")
+    
     safe_log('info', f"Formatted leaderboard entries - Easy: {len(formatted_data['easy'])}, Medium: {len(formatted_data['medium'])}, Hard: {len(formatted_data['hard'])}")
     return formatted_data
 
