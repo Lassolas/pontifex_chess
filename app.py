@@ -192,43 +192,32 @@ def update_leaderboard(service, current_user=None, current_difficulty=None, curr
         max_entries = max(len(easy_entries), len(medium_entries), len(hard_entries))
         
         # Add all entries to the Google Sheet
+        # Each row contains entries from all three difficulties side by side
         for i in range(max_entries):
-            # Add easy entries
+            row = []
+            
+            # Easy difficulty column (columns 0-4)
             if i < len(easy_entries):
                 entry = easy_entries[i]
-                leaderboard_data.append([
-                    i + 1,  # Rank
-                    entry[0],  # Name
-                    entry[1],  # IES
-                    entry[2],  # Drift
-                    entry[3],  # Stability
-                    "", "", "", "", "",  # Medium placeholders
-                    "", "", "", "", ""   # Hard placeholders
-                ])
-            # Add medium entries
-            elif i < len(easy_entries) + len(medium_entries):
-                entry = medium_entries[i - len(easy_entries)]
-                leaderboard_data.append([
-                    "", "", "", "", "",  # Easy placeholders
-                    i + 1 - len(easy_entries),  # Rank
-                    entry[0],  # Name
-                    entry[1],  # IES
-                    entry[2],  # Drift
-                    entry[3],  # Stability
-                    "", "", "", "", ""   # Hard placeholders
-                ])
-            # Add hard entries
+                row.extend([i + 1, entry[0], entry[1], entry[2], entry[3]])  # Rank, Name, IES, Drift, Stability
             else:
-                entry = hard_entries[i - len(easy_entries) - len(medium_entries)]
-                leaderboard_data.append([
-                    "", "", "", "", "",  # Easy placeholders
-                    "", "", "", "", "",  # Medium placeholders
-                    i + 1 - len(easy_entries) - len(medium_entries),  # Rank
-                    entry[0],  # Name
-                    entry[1],  # IES
-                    entry[2],  # Drift
-                    entry[3]   # Stability
-                ])
+                row.extend(["", "", "", "", ""])
+            
+            # Medium difficulty column (columns 5-9)
+            if i < len(medium_entries):
+                entry = medium_entries[i]
+                row.extend([i + 1, entry[0], entry[1], entry[2], entry[3]])  # Rank, Name, IES, Drift, Stability
+            else:
+                row.extend(["", "", "", "", ""])
+            
+            # Hard difficulty column (columns 10-14)
+            if i < len(hard_entries):
+                entry = hard_entries[i]
+                row.extend([i + 1, entry[0], entry[1], entry[2], entry[3]])  # Rank, Name, IES, Drift, Stability
+            else:
+                row.extend(["", "", "", "", ""])
+            
+            leaderboard_data.append(row)
         
         # Clear the leaderboard sheet and write new data
         service.spreadsheets().values().clear(
@@ -457,28 +446,35 @@ def format_leaderboard_data(leaderboard_data):
 
     for i, row in enumerate(leaderboard_data[2:]):  # Skip first two header rows
         try:
-            # Skip header rows
-            if len(row) >= 9 and row[0] != "Rank" and row[3] != "Rank" and row[6] != "Rank":
-                # Easy column
-                if row[1] and row[1] != "Name":
+            # Skip header rows - new structure has 15 columns (5 per difficulty)
+            # Easy: 0-4, Medium: 5-9, Hard: 10-14
+            if len(row) >= 15 and row[0] != "Rank" and row[5] != "Rank" and row[10] != "Rank":
+                # Easy column (columns 0-4: Rank, Name, IES, Drift, Stability)
+                if len(row) > 1 and row[1] and row[1] != "Name":
                     formatted_data['easy'].append({
                         'rank': row[0],
                         'name': row[1],
-                        'score': row[2]
+                        'score': row[2] if len(row) > 2 else '',
+                        'drift': row[3] if len(row) > 3 else '',
+                        'stability': row[4] if len(row) > 4 else ''
                     })
-                # Medium column
-                if row[4] and row[4] != "Name":
+                # Medium column (columns 5-9: Rank, Name, IES, Drift, Stability)
+                if len(row) > 6 and row[6] and row[6] != "Name":
                     formatted_data['medium'].append({
-                        'rank': row[3],
-                        'name': row[4],
-                        'score': row[5]
+                        'rank': row[5],
+                        'name': row[6],
+                        'score': row[7] if len(row) > 7 else '',
+                        'drift': row[8] if len(row) > 8 else '',
+                        'stability': row[9] if len(row) > 9 else ''
                     })
-                # Hard column
-                if row[7] and row[7] != "Name":
+                # Hard column (columns 10-14: Rank, Name, IES, Drift, Stability)
+                if len(row) > 11 and row[11] and row[11] != "Name":
                     formatted_data['hard'].append({
-                        'rank': row[6],
-                        'name': row[7],
-                        'score': row[8]
+                        'rank': row[10],
+                        'name': row[11],
+                        'score': row[12] if len(row) > 12 else '',
+                        'drift': row[13] if len(row) > 13 else '',
+                        'stability': row[14] if len(row) > 14 else ''
                     })
         except (IndexError, ValueError) as e:
             safe_log('warning', f"Skipping invalid leaderboard row {i+1}: {row}, error: {str(e)}")

@@ -746,26 +746,36 @@ class GameUI {
                     row.className = 'highlight-current-user';
                 }
                 
-                // Calculate drift threshold based on IES (using entry's IES value if available)
-                const IES = entry.score; // Fallback to 1000 if IES is not available
+                // Parse IES score as number
+                const IES = parseFloat(entry.score) || 0;
                 const driftThreshold = 0.2 * IES; // 20% of IES
 
-                // Determine colors for drift and stability
-                const driftColor = entry.drift > driftThreshold ? 'darkgreen' :
-                                    entry.drift >= -driftThreshold ? 'darkgoldenrod' : 'darkred';
+                // Parse drift and stability, handle undefined/null/empty values
+                const drift = entry.drift !== undefined && entry.drift !== null && entry.drift !== '' 
+                    ? parseFloat(entry.drift) : null;
+                const stability = entry.stability !== undefined && entry.stability !== null && entry.stability !== '' 
+                    ? parseFloat(entry.stability) : null;
 
-                const stabilityColor = entry.stability >= 80 ? 'darkgreen' :
-                                    entry.stability >= 60 ? 'darkgoldenrod' : 'darkred';
+                // Determine colors for drift and stability
+                const driftColor = drift !== null 
+                    ? (drift > driftThreshold ? 'darkgreen' : drift >= -driftThreshold ? 'darkgoldenrod' : 'darkred')
+                    : 'gray';
+                const stabilityColor = stability !== null 
+                    ? (stability >= 80 ? 'darkgreen' : stability >= 60 ? 'darkgoldenrod' : 'darkred')
+                    : 'gray';
                 
                 // Format drift value with '+' for positive numbers
-                const driftDisplay = entry.drift >= 0 ? `+${entry.drift}` : entry.drift;
+                const driftDisplay = drift !== null 
+                    ? (drift >= 0 ? `+${drift}` : drift) 
+                    : 'N/A';
+                const stabilityDisplay = stability !== null ? `${stability}%` : 'N/A';
                 
                 row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${entry.name}</td>
-                    <td>${entry.score}</td>
+                    <td>${entry.rank || (index + 1)}</td>
+                    <td>${entry.name || ''}</td>
+                    <td>${entry.score || ''}</td>
                     <td style="color: ${driftColor}">${driftDisplay}</td>
-                    <td style="color: ${stabilityColor}">${entry.stability}%</td>
+                    <td style="color: ${stabilityColor}">${stabilityDisplay}</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -784,26 +794,36 @@ class GameUI {
                     const currentUserRow = document.createElement('tr');
                     currentUserRow.className = 'highlight-current-user';
                     
-                    // Calculate drift threshold based on IES (using entry's IES value if available)
-                    const IES = entry.ies || 1000; // Fallback to 1000 if IES is not available
+                    // Parse IES score as number
+                    const IES = parseFloat(currentUserEntry.score) || 0;
                     const driftThreshold = 0.2 * IES; // 20% of IES
-    
+
+                    // Parse drift and stability, handle undefined/null/empty values
+                    const drift = currentUserEntry.drift !== undefined && currentUserEntry.drift !== null && currentUserEntry.drift !== '' 
+                        ? parseFloat(currentUserEntry.drift) : null;
+                    const stability = currentUserEntry.stability !== undefined && currentUserEntry.stability !== null && currentUserEntry.stability !== '' 
+                        ? parseFloat(currentUserEntry.stability) : null;
+
                     // Determine colors for drift and stability
-                    const driftColor = entry.drift > driftThreshold ? 'darkgreen' :
-                                        entry.drift >= -driftThreshold ? 'darkgoldenrod' : 'darkred';
-    
-                    const stabilityColor = entry.stability >= 80 ? 'darkgreen' :
-                                        entry.stability >= 60 ? 'darkgoldenrod' : 'darkred';
+                    const driftColor = drift !== null 
+                        ? (drift > driftThreshold ? 'darkgreen' : drift >= -driftThreshold ? 'darkgoldenrod' : 'darkred')
+                        : 'gray';
+                    const stabilityColor = stability !== null 
+                        ? (stability >= 80 ? 'darkgreen' : stability >= 60 ? 'darkgoldenrod' : 'darkred')
+                        : 'gray';
                     
                     // Format drift value with '+' for positive numbers
-                    const driftDisplay = currentUserEntry.drift >= 0 ? `+${currentUserEntry.drift}` : currentUserEntry.drift;
+                    const driftDisplay = drift !== null 
+                        ? (drift >= 0 ? `+${drift}` : drift) 
+                        : 'N/A';
+                    const stabilityDisplay = stability !== null ? `${stability}%` : 'N/A';
                     
                     currentUserRow.innerHTML = `
-                        <td>${entries.indexOf(currentUserEntry) + 1}</td>
-                        <td>${currentUserEntry.name}</td>
-                        <td>${currentUserEntry.score}</td>
+                        <td>${currentUserEntry.rank || (entries.indexOf(currentUserEntry) + 1)}</td>
+                        <td>${currentUserEntry.name || ''}</td>
+                        <td>${currentUserEntry.score || ''}</td>
                         <td style="color: ${driftColor}">${driftDisplay}</td>
-                        <td style="color: ${stabilityColor}">${currentUserEntry.stability}%</td>
+                        <td style="color: ${stabilityColor}">${stabilityDisplay}</td>
                     `;
                     tbody.appendChild(currentUserRow);
                 }
