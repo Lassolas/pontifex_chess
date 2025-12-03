@@ -122,53 +122,68 @@ def update_leaderboard(service, current_user=None, current_difficulty=None, curr
             elif current_difficulty.lower() == "hard":
                 hard_entries.append([current_user, current_ies, current_drift, current_stability, current_difficulty, current_board_time])
 
-        # Collect existing entries from all sheets
-        for sheet_name in sheet_titles:
-            if sheet_name == leaderboard_sheet_name or sheet_name == current_user:
-                continue
-
+        # Collect existing entries from Data sheet
+        data_sheet_name = "Data"
+        if data_sheet_name in sheet_titles:
             try:
-                # Get data from sheet
+                # Get all data rows from Data sheet (skip header row)
                 values = service.spreadsheets().values().get(
                     spreadsheetId=SHEET_ID, 
-                    range=f"{sheet_name}!A1:B20"
+                    range=f"{data_sheet_name}!A2:L10000"  # Columns A-L, starting from row 2
                 ).execute().get("values", [])
                 
-                data_dict = {row[0]: row[1] for row in values if len(row) > 1}
-
-                # Extract difficulty, IES, drift, and stability
-                ies = data_dict.get("Overall IES Score", data_dict.get("IES Score", data_dict.get("IES", "999999")))
-                try:
-                    ies = float(ies)
-                except (ValueError, TypeError):
-                    ies = 999999
-                
-                difficulty = data_dict.get("Difficulty", "N/A")
-                board_time = float(data_dict.get("Board Display Time", 0))
-                
-                # Extract drift and stability
-                drift = data_dict.get("Focus Drift", "0")
-                stability = data_dict.get("Focus Stability", "0")
-                
-                try:
-                    drift = float(drift)
-                    stability = float(stability)
-                except (ValueError, TypeError):
-                    drift = 0
-                    stability = 0
-                
-                entry = [sheet_name, ies, drift, stability, difficulty, board_time]
-                
-                # Add to appropriate difficulty list
-                if difficulty.lower() == "easy":
-                    easy_entries.append(entry)
-                elif difficulty.lower() == "medium":
-                    medium_entries.append(entry)
-                elif difficulty.lower() == "hard":
-                    hard_entries.append(entry)
+                # Data sheet columns: Date, Time, Patient Name, Difficulty, Duration, 
+                # Board Display Time, Overall IES Score, IES1, IES2, IES3, Focus Drift, Focus Stability
+                for row in values:
+                    if len(row) < 7:  # Need at least Date, Time, Patient Name, Difficulty, Duration, Board Display Time, Overall IES Score
+                        continue
+                    
+                    try:
+                        patient_name = row[2] if len(row) > 2 else ""
+                        difficulty = row[3] if len(row) > 3 else "N/A"
+                        
+                        # Skip current user's entry if it's being added separately
+                        if current_user and patient_name == current_user:
+                            continue
+                        
+                        # Extract IES
+                        ies_str = row[6] if len(row) > 6 else "999999"
+                        try:
+                            ies = float(ies_str)
+                        except (ValueError, TypeError):
+                            ies = 999999
+                        
+                        # Extract board time
+                        board_time_str = row[5] if len(row) > 5 else "0"
+                        try:
+                            board_time = float(board_time_str)
+                        except (ValueError, TypeError):
+                            board_time = 0
+                        
+                        # Extract drift and stability
+                        drift_str = row[10] if len(row) > 10 else "0"
+                        stability_str = row[11] if len(row) > 11 else "0"
+                        try:
+                            drift = float(drift_str)
+                            stability = float(stability_str)
+                        except (ValueError, TypeError):
+                            drift = 0
+                            stability = 0
+                        
+                        entry = [patient_name, ies, drift, stability, difficulty, board_time]
+                        
+                        # Add to appropriate difficulty list
+                        if difficulty.lower() == "easy":
+                            easy_entries.append(entry)
+                        elif difficulty.lower() == "medium":
+                            medium_entries.append(entry)
+                        elif difficulty.lower() == "hard":
+                            hard_entries.append(entry)
+                    except Exception as e:
+                        safe_log('warning', f"Skipping data row due to error: {e}")
+                        continue
             except Exception as e:
-                safe_log('warning', f"Skipping sheet {sheet_name} due to missing or invalid data: {e}")
-                continue
+                safe_log('warning', f"Error reading from Data sheet: {e}")
             
         # Sort each difficulty group by IES (ascending)
         easy_entries = sorted(easy_entries, key=lambda x: float(x[1]))
@@ -333,29 +348,97 @@ def submit_results():
         # Create service
         service = get_sheets_service()
         
-        # 1. First save detailed results to a new sheet
+        # 1. Save data to single "Data" sheet (one row per submission)
         current_date = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H:%M:%S')
         
-        sheet_data = [
-            ['Date', current_date],
-            ['Time', current_time],
-            ['Patient Name', patient_name],
-            ['Difficulty', display_difficulty],
-            ['Duration', duration],
-            ['Board Display Time', board_display_time],
-            ['Overall IES Score', overall_ies],
-            ['IES1 (First 60s)', ies1],
-            ['IES2 (Second 60s)', ies2],
-            ['IES3 (Last 60s)', ies3],
-            ['Focus Drift', focus_drift],
-            ['Focus Stability', focus_stability],
-            ['Trial', 'Trial Time', 'Attacking Piece', 'Attacking Position', 
-             'Attacked Pieces', 'Response Time', 'Success', 'Response Position']
+        # Get spreadsheet to check for existing sheets
+        spreadsheet = service.spreadsheets().get(spreadsheetId=SHEET_ID).execute()
+        sheet_titles = [s['properties']['title'] for s in spreadsheet['sheets']]
+        
+        data_sheet_name = "Data"
+        trials_sheet_name = "Trials"
+        
+        # Create Data sheet if it doesn't exist
+        if data_sheet_name not in sheet_titles:
+            service.spreadsheets().batchUpdate(
+                spreadsheetId=SHEET_ID,
+                body={
+                    "requests": [{
+                        "addSheet": {
+                            "properties": {"title": data_sheet_name}
+                        }
+                    }]
+                }
+            ).execute()
+            # Add header row
+            header_row = [
+                'Date', 'Time', 'Patient Name', 'Difficulty', 'Duration', 
+                'Board Display Time', 'Overall IES Score', 'IES1 (First 60s)', 
+                'IES2 (Second 60s)', 'IES3 (Last 60s)', 'Focus Drift', 'Focus Stability'
+            ]
+            service.spreadsheets().values().update(
+                spreadsheetId=SHEET_ID,
+                range=f"{data_sheet_name}!A1",
+                valueInputOption="RAW",
+                body={"values": [header_row]}
+            ).execute()
+        
+        # Create Trials sheet if it doesn't exist
+        if trials_sheet_name not in sheet_titles:
+            service.spreadsheets().batchUpdate(
+                spreadsheetId=SHEET_ID,
+                body={
+                    "requests": [{
+                        "addSheet": {
+                            "properties": {"title": trials_sheet_name}
+                        }
+                    }]
+                }
+            ).execute()
+            # Add header row for trials
+            trials_header = [
+                'Date', 'Time', 'Patient Name', 'Trial', 'Trial Time', 
+                'Attacking Piece', 'Attacking Position', 'Attacked Pieces', 
+                'Response Time', 'Success', 'Response Position'
+            ]
+            service.spreadsheets().values().update(
+                spreadsheetId=SHEET_ID,
+                range=f"{trials_sheet_name}!A1",
+                valueInputOption="RAW",
+                body={"values": [trials_header]}
+            ).execute()
+        
+        # 2. Append summary data row to Data sheet
+        data_row = [
+            current_date,
+            current_time,
+            patient_name,
+            display_difficulty,
+            duration,
+            board_display_time,
+            overall_ies,
+            ies1,
+            ies2,
+            ies3,
+            focus_drift,
+            focus_stability
         ]
         
+        service.spreadsheets().values().append(
+            spreadsheetId=SHEET_ID,
+            range=f"{data_sheet_name}!A:A",
+            valueInputOption="RAW",
+            body={"values": [data_row]}
+        ).execute()
+        
+        # 3. Append trial data rows to Trials sheet
+        trial_rows = []
         for trial in trial_data:
-            sheet_data.append([
+            trial_rows.append([
+                current_date,
+                current_time,
+                patient_name,
                 trial.get('trial', ''),
                 trial.get('trialTime', ''),
                 trial.get('attackingPiece', ''),
@@ -366,29 +449,13 @@ def submit_results():
                 trial.get('responsePosition', '')
             ])
         
-        # Create new sheet for patient results if it doesn't exist
-        spreadsheet = service.spreadsheets().get(spreadsheetId=SHEET_ID).execute()
-        sheet_titles = [s['properties']['title'] for s in spreadsheet['sheets']]
-        
-        if patient_name not in sheet_titles:
-            service.spreadsheets().batchUpdate(
+        if trial_rows:
+            service.spreadsheets().values().append(
                 spreadsheetId=SHEET_ID,
-                body={
-                    "requests": [{
-                        "addSheet": {
-                            "properties": {"title": patient_name}
-                        }
-                    }]
-                }
+                range=f"{trials_sheet_name}!A:A",
+                valueInputOption="RAW",
+                body={"values": trial_rows}
             ).execute()
-        
-        # 2. Write data to sheet
-        service.spreadsheets().values().update(
-            spreadsheetId=SHEET_ID,
-            range=f"{patient_name}!A1",
-            valueInputOption="RAW",
-            body={"values": sheet_data}
-        ).execute()
 
         # 3. Update leaderboard with correct difficulty
         update_leaderboard_result = update_leaderboard(
