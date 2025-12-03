@@ -1,12 +1,10 @@
 class GameUI {
     constructor() {
         this.game = new ChessGame();
-        this.currentScreen = 'language';
+        this.currentScreen = 'name-input';
         this.patientName = '';
         this.timer = null;
         this.countdownTimer = null;
-        this.pieceTimer = null; // Timer for piece display time
-        this.pieceDisplayStartTime = null; // Start time when piece is shown
         this.remainingTime = this.game.duration;
         this.showBoard = false;
         this.showAttackingPiece = false;
@@ -23,22 +21,15 @@ class GameUI {
         });
         
         this.screens = {
-            'language': document.getElementById('language-screen'),
             'name-input': document.getElementById('name-input-screen'),
-            'instructions': document.getElementById('instructions-screen'),
             'intro': document.getElementById('intro-screen'),
             'countdown': document.getElementById('countdown-screen'),
             'game': document.getElementById('game-screen'),
             'results': document.getElementById('results-screen')
         };
 
-        // Language buttons
-        this.langFrBtn = document.getElementById('lang-fr');
-        this.langEnBtn = document.getElementById('lang-en');
-        
         this.nameInput = document.getElementById('patient-name');
         this.startButton = document.getElementById('start-button');
-        this.continueButton = document.getElementById('continue-button');
         
         // Mode buttons
         this.trainingBtn = document.getElementById('training-btn');
@@ -48,10 +39,6 @@ class GameUI {
         
         this.downloadButton = document.getElementById('download-button');
         this.restartButton = document.getElementById('restart-button');
-        
-        // Piece timer element
-        this.pieceTimerElement = document.getElementById('piece-timer');
-        this.pieceTimerValue = document.getElementById('piece-timer-value');
 
         this.difficultyButtons = document.querySelectorAll('.difficulty-btn');
         this.durationButtons = document.querySelectorAll('.duration-btn');
@@ -93,29 +80,15 @@ class GameUI {
     }
 
     initializeEventListeners() {
-        // Language selection
-        if (this.langFrBtn) {
-            this.langFrBtn.addEventListener('click', () => {
-                i18n.setLanguage('fr');
-                this.showScreen('name-input');
-            });
-        }
-        if (this.langEnBtn) {
-            this.langEnBtn.addEventListener('click', () => {
-                i18n.setLanguage('en');
-                this.showScreen('name-input');
-            });
-        }
-        
         // Name input screen
         this.startButton.addEventListener('click', (e) => {
             e.preventDefault();
             const name = this.nameInput.value.trim();
             if (name) {
                 this.patientName = name;
-                this.showScreen('instructions');
+                this.showScreen('intro');
             } else {
-                alert(i18n.getTranslation('name.error'));
+                alert('Please enter your name to continue.');
             }
         });
         
@@ -125,18 +98,11 @@ class GameUI {
             const name = this.nameInput.value.trim();
             if (name) {
                 this.patientName = name;
-                this.showScreen('instructions');
+                this.showScreen('intro');
             } else {
-                alert(i18n.getTranslation('name.error'));
+                alert('Please enter your name to continue.');
             }
         });
-        
-        // Continue button from instructions
-        if (this.continueButton) {
-            this.continueButton.addEventListener('click', () => {
-                this.showScreen('intro');
-            });
-        }
 
         // Restart button - reload the page instead of using our logic
         if (this.restartButton) {
@@ -243,9 +209,6 @@ class GameUI {
     }
 
     startNewTrial() {
-        // Stop any existing piece timer
-        this.stopPieceTimer();
-        
         this.game.generatePosition();
         this.showBoard = true;
         this.showAttackingPiece = false;
@@ -256,15 +219,10 @@ class GameUI {
         this.game.currentTrial++;
         
         // Update trial count display
-        this.trialCount.textContent = `${i18n.getTranslation('game.trial')} ${this.game.currentTrial}`;
+        this.trialCount.textContent = `Trial ${this.game.currentTrial}`;
 
         // Clear the attacking piece display
         this.attackingPieceContainer.innerHTML = '';
-        
-        // Hide piece timer initially
-        if (this.pieceTimerElement) {
-            this.pieceTimerElement.style.display = 'none';
-        }
         
         // Log the trial time when the attacking piece is shown
         this.game.trialTime = Date.now();
@@ -280,13 +238,6 @@ class GameUI {
             
             // Store the time when the attacking piece is shown
             this.game.attackingPieceShownTime = Date.now();
-            this.pieceDisplayStartTime = Date.now();
-            
-            // Show and start piece timer
-            if (this.pieceTimerElement) {
-                this.pieceTimerElement.style.display = 'block';
-            }
-            this.startPieceTimer();
         }, this.game.boardDisplayTime * 1000);
     }
 
@@ -304,43 +255,6 @@ class GameUI {
         const minutes = Math.floor(this.remainingTime / 60);
         const seconds = this.remainingTime % 60;
         this.timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-    
-    startPieceTimer() {
-        // Clear any existing piece timer
-        if (this.pieceTimer) {
-            clearInterval(this.pieceTimer);
-        }
-        
-        // Update timer every 100ms for smooth display
-        this.pieceTimer = setInterval(() => {
-            if (this.pieceDisplayStartTime && this.showAttackingPiece) {
-                const elapsed = (Date.now() - this.pieceDisplayStartTime) / 1000;
-                if (this.pieceTimerValue) {
-                    this.pieceTimerValue.textContent = elapsed.toFixed(1);
-                }
-            } else {
-                // Stop timer if piece is no longer shown
-                if (this.pieceTimer) {
-                    clearInterval(this.pieceTimer);
-                    this.pieceTimer = null;
-                }
-                if (this.pieceTimerElement) {
-                    this.pieceTimerElement.style.display = 'none';
-                }
-            }
-        }, 100);
-    }
-    
-    stopPieceTimer() {
-        if (this.pieceTimer) {
-            clearInterval(this.pieceTimer);
-            this.pieceTimer = null;
-        }
-        if (this.pieceTimerElement) {
-            this.pieceTimerElement.style.display = 'none';
-        }
-        this.pieceDisplayStartTime = null;
     }
 
     drawChessboard() {
@@ -444,9 +358,6 @@ class GameUI {
 
         this.game.hasResponded = true;
         const responseTime = (Date.now() - this.game.attackingPieceShownTime) / 1000;
-        
-        // Stop piece timer
-        this.stopPieceTimer();
 
         // Check if clicked square is in attacked squares
         const isCorrect = piece && this.game.attackedPieces.some(([r, c]) => r === row && c === col);
@@ -540,7 +451,6 @@ class GameUI {
 
     endGame() {
         clearInterval(this.timer);
-        this.stopPieceTimer();
         this.showScreen('results');
 
         // Calculate and display summary
@@ -731,11 +641,11 @@ class GameUI {
         // Safely handle loading element
         try {
             if (this.leaderboardLoading) {
-                this.leaderboardLoading.textContent = i18n.getTranslation('leaderboard.loading');
+                this.leaderboardLoading.textContent = 'Loading leaderboard...';
             } else {
                 this.leaderboardLoading = document.getElementById('leaderboard-loading');
                 if (this.leaderboardLoading) {
-                    this.leaderboardLoading.textContent = i18n.getTranslation('leaderboard.loading');
+                    this.leaderboardLoading.textContent = 'Loading leaderboard...';
                 }
             }
         } catch (e) {
@@ -767,7 +677,7 @@ class GameUI {
             
             // Show error message if element exists
             if (this.leaderboardLoading) {
-                this.leaderboardLoading.textContent = i18n.getTranslation('leaderboard.failed');
+                this.leaderboardLoading.textContent = 'Failed to load leaderboard';
             }
         }
     }
@@ -808,11 +718,11 @@ class GameUI {
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
             headerRow.innerHTML = `
-                <th>${i18n.getTranslation('leaderboard.rank')}</th>
-                <th>${i18n.getTranslation('leaderboard.name')}</th>
-                <th>${i18n.getTranslation('leaderboard.score')}</th>
-                <th>${i18n.getTranslation('leaderboard.drift')}</th>
-                <th>${i18n.getTranslation('leaderboard.stability')}</th>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>IES (s)</th>
+                <th>Drift (s)</th>
+                <th>Stability (%)</th>
             `;
             thead.appendChild(headerRow);
             table.appendChild(thead);
@@ -877,7 +787,7 @@ class GameUI {
                     const separator = document.createElement('tr');
                     separator.className = 'leaderboard-separator';
                     separator.innerHTML = `
-                        <td colspan="5">${i18n.getTranslation('leaderboard.yourScore')}</td>
+                        <td colspan="5">Your Score:</td>
                     `;
                     tbody.appendChild(separator);
 
