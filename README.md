@@ -31,6 +31,8 @@ Results are stored locally in GSHEET format and downloadable CSV with the follow
 - Position details
 - Timestamps
 
+Detailed definitions for the session-level focus and endurance metrics are documented in `FOCUS_METRICS_README.md`.
+
 
 ## Directory Structure
 

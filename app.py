@@ -17,6 +17,26 @@ load_dotenv()
 # Google Sheets API setup
 SHEET_ID = "1M2TjhCmjLX6w3POBNoTLlC1QXOeZxXIPaKjTPrdECeo"  # Replace with your existing sheet ID
 
+DATA_SHEET_HEADERS = [
+    'Date', 'Time', 'Patient Name', 'Difficulty', 'Duration',
+    'Board Display Time', 'Overall IES Score', 'IES1 (First 60s)',
+    'IES2 (Second 60s)', 'IES3 (Last 60s)', 'Focus Drift', 'Focus Stability',
+    'Overall Accuracy (%)', 'Overall Median RT (s)', 'Overall RT CV', 'Overall Lapse Rate (%)',
+    'Accuracy 1st Third (%)', 'Accuracy 2nd Third (%)', 'Accuracy 3rd Third (%)',
+    'Median RT 1st Third (s)', 'Median RT 2nd Third (s)', 'Median RT 3rd Third (s)',
+    'RT CV 1st Third', 'RT CV 2nd Third', 'RT CV 3rd Third',
+    'Lapse Rate 1st Third (%)', 'Lapse Rate 2nd Third (%)', 'Lapse Rate 3rd Third (%)',
+    'RT Decrement (%)', 'Accuracy Decrement (%)', 'IES Decrement (%)',
+    'RT Slope', 'Success Slope', 'IES Slope', 'Error Rate Slope',
+    'Post-Error RT Delta (s)', 'Post-Error Accuracy Delta (pp)', 'RT-Success Correlation'
+]
+
+TRIALS_SHEET_HEADERS = [
+    'Date', 'Time', 'Patient Name', 'Trial', 'Trial Time',
+    'Attacking Piece', 'Attacking Position', 'Attacked Pieces',
+    'Response Time', 'Success', 'Response Position'
+]
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -54,6 +74,329 @@ def safe_log(level, message):
         logging.warning(redacted)
     else:
         logging.info(redacted)
+
+
+def to_float(value, default=None):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def median(values):
+    if not values:
+        return None
+
+    sorted_values = sorted(values)
+    midpoint = len(sorted_values) // 2
+
+    if len(sorted_values) % 2 == 1:
+        return sorted_values[midpoint]
+
+    return (sorted_values[midpoint - 1] + sorted_values[midpoint]) / 2
+
+
+def mean(values):
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def standard_deviation(values):
+    if not values:
+        return None
+
+    average = mean(values)
+    variance = sum((value - average) ** 2 for value in values) / len(values)
+    return math.sqrt(variance)
+
+
+def round_metric(value, digits=2):
+    if value is None or not math.isfinite(value):
+        return ""
+    return round(value, digits)
+
+
+def percent(value, digits=2):
+    if value is None or not math.isfinite(value):
+        return ""
+    return round(value * 100, digits)
+
+
+def coefficient_of_variation(values):
+    average = mean(values)
+    if average in (None, 0):
+        return None
+
+    deviation = standard_deviation(values)
+    if deviation is None:
+        return None
+
+    return deviation / average
+
+
+def percent_change(first_value, last_value):
+    if first_value in (None, 0) or last_value is None:
+        return None
+    return ((last_value - first_value) / first_value) * 100
+
+
+def linear_slope(x_values, y_values):
+    if len(x_values) != len(y_values) or len(x_values) < 2:
+        return None
+
+    x_mean = mean(x_values)
+    y_mean = mean(y_values)
+    denominator = sum((x - x_mean) ** 2 for x in x_values)
+
+    if denominator == 0:
+        return None
+
+    numerator = sum((x - x_mean) * (y - y_mean) for x, y in zip(x_values, y_values))
+    return numerator / denominator
+
+
+def pearson_correlation(x_values, y_values):
+    if len(x_values) != len(y_values) or len(x_values) < 2:
+        return None
+
+    x_mean = mean(x_values)
+    y_mean = mean(y_values)
+    x_sd = standard_deviation(x_values)
+    y_sd = standard_deviation(y_values)
+
+    if x_sd in (None, 0) or y_sd in (None, 0):
+        return None
+
+    covariance = sum((x - x_mean) * (y - y_mean) for x, y in zip(x_values, y_values)) / len(x_values)
+    return covariance / (x_sd * y_sd)
+
+
+def calculate_ies_for_trials(trials):
+    if not trials:
+        return 999999
+
+    successful_trials = [trial for trial in trials if trial['success'] == 1 and trial['response_time'] is not None]
+    if not successful_trials:
+        return 999999
+
+    accuracy = len(successful_trials) / len(trials)
+    median_response_time = median([trial['response_time'] for trial in successful_trials])
+
+    if median_response_time is None or accuracy <= 0:
+        return 999999
+
+    return round(median_response_time / accuracy, 2)
+
+
+def split_trials_by_time_thirds(trials, duration):
+    sorted_trials = sorted(trials, key=lambda trial: trial['trial_time'])
+    total_time = to_float(duration)
+
+    if total_time in (None, 0):
+        total_time = max((trial['trial_time'] for trial in sorted_trials), default=0)
+
+    if total_time == 0:
+        total_time = max(len(sorted_trials), 1)
+
+    interval_duration = total_time / 3
+    trial_groups = {'first': [], 'second': [], 'third': []}
+
+    for trial in sorted_trials:
+        trial_time = trial['trial_time']
+
+        if trial_time < interval_duration:
+            trial_groups['first'].append(trial)
+        elif trial_time < 2 * interval_duration:
+            trial_groups['second'].append(trial)
+        else:
+            trial_groups['third'].append(trial)
+
+    return trial_groups
+
+
+def summarize_block(trials, lapse_threshold):
+    response_times = [trial['response_time'] for trial in trials if trial['response_time'] is not None]
+    accuracy = (sum(trial['success'] for trial in trials) / len(trials)) if trials else None
+    lapse_rate = None
+
+    if response_times and lapse_threshold is not None:
+        lapse_rate = sum(1 for response_time in response_times if response_time > lapse_threshold) / len(response_times)
+
+    return {
+        'accuracy': accuracy,
+        'median_rt': median(response_times),
+        'rt_cv': coefficient_of_variation(response_times),
+        'lapse_rate': lapse_rate,
+        'ies': calculate_ies_for_trials(trials)
+    }
+
+
+def calculate_session_metrics(trial_data, duration):
+    if not trial_data:
+        return None
+
+    normalized_trials = []
+    for index, trial in enumerate(trial_data, start=1):
+        response_time = to_float(trial.get('responseTime'))
+        success = 1 if str(trial.get('success', 0)) == '1' else 0
+        trial_time = to_float(trial.get('trialTime'))
+        if trial_time is None:
+            trial_time = index
+
+        normalized_trials.append({
+            'trial_number': index,
+            'trial_time': trial_time,
+            'response_time': response_time,
+            'success': success
+        })
+
+    successful_trials = sum(trial['success'] for trial in normalized_trials)
+    if successful_trials < 5:
+        return {
+            'overall_ies': 999999,
+            'ies1': 999999,
+            'ies2': 999999,
+            'ies3': 999999,
+            'focus_drift': 0,
+            'focus_stability': 0,
+            'extra_metrics': {}
+        }
+
+    response_times = [trial['response_time'] for trial in normalized_trials if trial['response_time'] is not None]
+    overall_accuracy = successful_trials / len(normalized_trials) if normalized_trials else None
+    overall_median_rt = median(response_times)
+    overall_rt_cv = coefficient_of_variation(response_times)
+    response_time_sd = standard_deviation(response_times)
+    lapse_threshold = None
+
+    if overall_median_rt is not None and response_time_sd is not None:
+        lapse_threshold = overall_median_rt + (2 * response_time_sd)
+
+    overall_lapse_rate = None
+    if response_times and lapse_threshold is not None:
+        overall_lapse_rate = sum(1 for response_time in response_times if response_time > lapse_threshold) / len(response_times)
+
+    blocks = split_trials_by_time_thirds(normalized_trials, duration)
+    first_block = summarize_block(blocks['first'], lapse_threshold)
+    second_block = summarize_block(blocks['second'], lapse_threshold)
+    third_block = summarize_block(blocks['third'], lapse_threshold)
+
+    ies1 = first_block['ies']
+    ies2 = second_block['ies']
+    ies3 = third_block['ies']
+    overall_ies = round((ies1 * ies2 * ies3) ** (1 / 3), 2)
+
+    try:
+        focus_drift = round(ies1 - ies3, 2)
+        mean_ies = (ies1 + ies2 + ies3) / 3
+        average_deviation = (abs(ies1 - mean_ies) + abs(ies2 - mean_ies) + abs(ies3 - mean_ies)) / 3
+        focus_stability = round(100 * (1 - (average_deviation / mean_ies)))
+        focus_stability = max(0, min(100, focus_stability))
+    except (ValueError, ZeroDivisionError):
+        focus_drift = 0
+        focus_stability = 0
+
+    valid_ies_points = [
+        (1, first_block['ies'] if first_block['ies'] != 999999 else None),
+        (2, second_block['ies'] if second_block['ies'] != 999999 else None),
+        (3, third_block['ies'] if third_block['ies'] != 999999 else None)
+    ]
+    ies_x_values = [point[0] for point in valid_ies_points if point[1] is not None]
+    ies_y_values = [point[1] for point in valid_ies_points if point[1] is not None]
+
+    post_error_trials = []
+    post_correct_trials = []
+    for previous_trial, current_trial in zip(normalized_trials, normalized_trials[1:]):
+        if previous_trial['success'] == 0:
+            post_error_trials.append(current_trial)
+        else:
+            post_correct_trials.append(current_trial)
+
+    post_error_rt_delta = None
+    post_error_accuracy_delta = None
+
+    if post_error_trials and post_correct_trials:
+        post_error_rt = mean([trial['response_time'] for trial in post_error_trials if trial['response_time'] is not None])
+        post_correct_rt = mean([trial['response_time'] for trial in post_correct_trials if trial['response_time'] is not None])
+        post_error_accuracy = mean([trial['success'] for trial in post_error_trials])
+        post_correct_accuracy = mean([trial['success'] for trial in post_correct_trials])
+
+        if post_error_rt is not None and post_correct_rt is not None:
+            post_error_rt_delta = post_error_rt - post_correct_rt
+
+        if post_error_accuracy is not None and post_correct_accuracy is not None:
+            post_error_accuracy_delta = (post_error_accuracy - post_correct_accuracy) * 100
+
+    trial_numbers = [trial['trial_number'] for trial in normalized_trials if trial['response_time'] is not None]
+    rt_values = [trial['response_time'] for trial in normalized_trials if trial['response_time'] is not None]
+    success_values = [trial['success'] for trial in normalized_trials]
+
+    extra_metrics = {
+        'overall_accuracy_pct': percent(overall_accuracy),
+        'overall_median_rt': round_metric(overall_median_rt),
+        'overall_rt_cv': round_metric(overall_rt_cv, 4),
+        'overall_lapse_rate_pct': percent(overall_lapse_rate),
+        'accuracy_first_pct': percent(first_block['accuracy']),
+        'accuracy_second_pct': percent(second_block['accuracy']),
+        'accuracy_third_pct': percent(third_block['accuracy']),
+        'median_rt_first': round_metric(first_block['median_rt']),
+        'median_rt_second': round_metric(second_block['median_rt']),
+        'median_rt_third': round_metric(third_block['median_rt']),
+        'rt_cv_first': round_metric(first_block['rt_cv'], 4),
+        'rt_cv_second': round_metric(second_block['rt_cv'], 4),
+        'rt_cv_third': round_metric(third_block['rt_cv'], 4),
+        'lapse_rate_first_pct': percent(first_block['lapse_rate']),
+        'lapse_rate_second_pct': percent(second_block['lapse_rate']),
+        'lapse_rate_third_pct': percent(third_block['lapse_rate']),
+        'rt_decrement_pct': round_metric(percent_change(first_block['median_rt'], third_block['median_rt'])),
+        'accuracy_decrement_pct': round_metric(percent_change(first_block['accuracy'], third_block['accuracy'])),
+        'ies_decrement_pct': round_metric(percent_change(ies_y_values[0], ies_y_values[-1])) if len(ies_y_values) >= 2 else "",
+        'rt_slope': round_metric(linear_slope(trial_numbers, rt_values), 4),
+        'success_slope': round_metric(linear_slope([trial['trial_number'] for trial in normalized_trials], success_values), 4),
+        'ies_slope': round_metric(linear_slope(ies_x_values, ies_y_values), 4),
+        'error_rate_slope': round_metric(linear_slope([trial['trial_number'] for trial in normalized_trials], [1 - success for success in success_values]), 4),
+        'post_error_rt_delta': round_metric(post_error_rt_delta),
+        'post_error_accuracy_delta_pp': round_metric(post_error_accuracy_delta),
+        'rt_success_correlation': round_metric(
+            pearson_correlation(rt_values, [trial['success'] for trial in normalized_trials if trial['response_time'] is not None]),
+            4
+        )
+    }
+
+    return {
+        'overall_ies': overall_ies,
+        'ies1': ies1,
+        'ies2': ies2,
+        'ies3': ies3,
+        'focus_drift': focus_drift,
+        'focus_stability': focus_stability,
+        'extra_metrics': extra_metrics
+    }
+
+
+def calculate_ies(trial_data, duration):
+    metrics = calculate_session_metrics(trial_data, duration)
+    if not metrics:
+        return 999999, 999999, 999999, 999999, 0, 0
+
+    return (
+        metrics['overall_ies'],
+        metrics['ies1'],
+        metrics['ies2'],
+        metrics['ies3'],
+        metrics['focus_drift'],
+        metrics['focus_stability']
+    )
+
+
+def ensure_sheet_header(service, sheet_name, headers):
+    service.spreadsheets().values().update(
+        spreadsheetId=SHEET_ID,
+        range=f"{sheet_name}!A1",
+        valueInputOption="RAW",
+        body={"values": [headers]}
+    ).execute()
 
 # Function to get Google Sheets service
 def get_sheets_service():
@@ -345,11 +688,20 @@ def submit_results():
                 "message": "Missing required fields"
             }), 400
 
-        # Calculate IES from trial data
-        overall_ies, ies1, ies2, ies3, focus_drift, focus_stability = calculate_ies(
-            trial_data, 
-            duration=duration  # Pass duration to calculate_ies
-        )
+        metrics = calculate_session_metrics(trial_data, duration)
+        if not metrics:
+            return jsonify({
+                "success": False,
+                "message": "Missing trial data"
+            }), 400
+
+        overall_ies = metrics['overall_ies']
+        ies1 = metrics['ies1']
+        ies2 = metrics['ies2']
+        ies3 = metrics['ies3']
+        focus_drift = metrics['focus_drift']
+        focus_stability = metrics['focus_stability']
+        extra_metrics = metrics['extra_metrics']
         
         # Check if we have insufficient trials
         if overall_ies == 999999:
@@ -386,18 +738,9 @@ def submit_results():
                     }]
                 }
             ).execute()
-            # Add header row
-            header_row = [
-                'Date', 'Time', 'Patient Name', 'Difficulty', 'Duration', 
-                'Board Display Time', 'Overall IES Score', 'IES1 (First 60s)', 
-                'IES2 (Second 60s)', 'IES3 (Last 60s)', 'Focus Drift', 'Focus Stability'
-            ]
-            service.spreadsheets().values().update(
-                spreadsheetId=SHEET_ID,
-                range=f"{data_sheet_name}!A1",
-                valueInputOption="RAW",
-                body={"values": [header_row]}
-            ).execute()
+            ensure_sheet_header(service, data_sheet_name, DATA_SHEET_HEADERS)
+        else:
+            ensure_sheet_header(service, data_sheet_name, DATA_SHEET_HEADERS)
         
         # Create Trials sheet if it doesn't exist
         if trials_sheet_name not in sheet_titles:
@@ -411,18 +754,9 @@ def submit_results():
                     }]
                 }
             ).execute()
-            # Add header row for trials
-            trials_header = [
-                'Date', 'Time', 'Patient Name', 'Trial', 'Trial Time', 
-                'Attacking Piece', 'Attacking Position', 'Attacked Pieces', 
-                'Response Time', 'Success', 'Response Position'
-            ]
-            service.spreadsheets().values().update(
-                spreadsheetId=SHEET_ID,
-                range=f"{trials_sheet_name}!A1",
-                valueInputOption="RAW",
-                body={"values": [trials_header]}
-            ).execute()
+            ensure_sheet_header(service, trials_sheet_name, TRIALS_SHEET_HEADERS)
+        else:
+            ensure_sheet_header(service, trials_sheet_name, TRIALS_SHEET_HEADERS)
         
         # 2. Append summary data row to Data sheet
         data_row = [
@@ -437,7 +771,33 @@ def submit_results():
             ies2,
             ies3,
             focus_drift,
-            focus_stability
+            focus_stability,
+            extra_metrics.get('overall_accuracy_pct', ''),
+            extra_metrics.get('overall_median_rt', ''),
+            extra_metrics.get('overall_rt_cv', ''),
+            extra_metrics.get('overall_lapse_rate_pct', ''),
+            extra_metrics.get('accuracy_first_pct', ''),
+            extra_metrics.get('accuracy_second_pct', ''),
+            extra_metrics.get('accuracy_third_pct', ''),
+            extra_metrics.get('median_rt_first', ''),
+            extra_metrics.get('median_rt_second', ''),
+            extra_metrics.get('median_rt_third', ''),
+            extra_metrics.get('rt_cv_first', ''),
+            extra_metrics.get('rt_cv_second', ''),
+            extra_metrics.get('rt_cv_third', ''),
+            extra_metrics.get('lapse_rate_first_pct', ''),
+            extra_metrics.get('lapse_rate_second_pct', ''),
+            extra_metrics.get('lapse_rate_third_pct', ''),
+            extra_metrics.get('rt_decrement_pct', ''),
+            extra_metrics.get('accuracy_decrement_pct', ''),
+            extra_metrics.get('ies_decrement_pct', ''),
+            extra_metrics.get('rt_slope', ''),
+            extra_metrics.get('success_slope', ''),
+            extra_metrics.get('ies_slope', ''),
+            extra_metrics.get('error_rate_slope', ''),
+            extra_metrics.get('post_error_rt_delta', ''),
+            extra_metrics.get('post_error_accuracy_delta_pp', ''),
+            extra_metrics.get('rt_success_correlation', '')
         ]
         
         service.spreadsheets().values().append(
@@ -567,124 +927,6 @@ def format_leaderboard_data(leaderboard_data):
     
     safe_log('info', f"Formatted leaderboard entries - Easy: {len(formatted_data['easy'])}, Medium: {len(formatted_data['medium'])}, Hard: {len(formatted_data['hard'])}")
     return formatted_data
-
-def calculate_ies(trial_data, duration):
-    """
-    Calculate Inverse Efficiency Scores (IES) from trial data.
-    IES = median response time / accuracy
-    
-    Returns:
-    - Overall IES
-    - IES1: First 60 seconds
-    - IES2: Second 60 seconds
-    - IES3: Last 60 seconds
-    - Focus Drift
-    - Focus Stability
-    
-    Includes:
-    - Minimum trial threshold (require at least 5 successful trials)
-    - Smoothing factor to prevent explosion when accuracy approaches 0
-    """
-    if not trial_data:
-        return 999999, 999999, 999999, 999999, 0, 0
-    
-    # Calculate accuracy (proportion of successful trials)
-    total_trials = len(trial_data)
-    successful_trials = sum(1 for trial in trial_data if trial.get('success') == 1)
-    
-    # Check minimum trial threshold
-    if successful_trials < 5:
-        return 999999, 999999, 999999, 999999, 0, 0
-    
-    # Calculate overall IES
-    def calculate_ies_for_trials(trials):
-        if not trials:
-            return 999999
-        
-        successful_trials = sum(1 for trial in trials if trial.get('success') == 1)
-        total_trials = len(trials)
-        if successful_trials < 1:  # Need at least one successful trial
-            return 999999
-            
-        accuracy = successful_trials / total_trials
-
-        # Get all response times for successful trials
-        response_times = [trial.get('responseTime', 0) for trial in trials if trial.get('success') == 1]
-        
-        # Sort response times
-        sorted_times = sorted(response_times)
-        
-        n = len(sorted_times)
-        
-        if n % 2 == 1:
-            median_response_time = sorted_times[n // 2]
-        else:
-            median_response_time = (sorted_times[n // 2 - 1] + sorted_times[n // 2]) / 2
-        
-        ies = median_response_time / accuracy if accuracy > 0 else 999999
-        return round(ies, 2) if ies is not None else 999999
-    
-    # Split trials into time intervals
-    trials_by_interval = {
-        'IES1': [],  # First 60 seconds
-        'IES2': [],  # Second 60 seconds
-        'IES3': []   # Last 60 seconds
-    }
-    
-    # Sort trials by trial time
-    sorted_trials = sorted(trial_data, key=lambda x: x.get('trialTime', 0))
-    
-    # Calculate time intervals using game duration instead of last trial time
-    total_time = duration  # Use the game duration directly
-    interval_duration = total_time / 3
-    
-    for trial in sorted_trials:
-        trial_time = trial.get('trialTime', 0)
-        if trial_time < interval_duration:
-            trials_by_interval['IES1'].append(trial)
-        elif trial_time < 2 * interval_duration:
-            trials_by_interval['IES2'].append(trial)
-        else:
-            trials_by_interval['IES3'].append(trial)
-    
-    # Calculate IES for each interval
-    ies1 = calculate_ies_for_trials(trials_by_interval['IES1'])
-    ies2 = calculate_ies_for_trials(trials_by_interval['IES2'])
-    ies3 = calculate_ies_for_trials(trials_by_interval['IES3'])
-
-    # Calculate overall IES only if all intervals have valid scores
-    if ies1 is None or ies2 is None or ies3 is None:
-        return None, None, None, None, 0, 0
-
-    # Calculate IES as the geometric mean of all 3 (to penalize inactive people)
-    overall_ies = round((ies1 * ies2 * ies3) ** (1/3), 2)
-
-    # Calculate additional informative scores
-    try:
-        # Calculate drift as the difference between first and last IES (in seconds)
-        # Positive value means improvement (became faster)
-        # Negative value means decline (became slower)
-        focus_drift = round(ies1 - ies3, 2)
-        
-        # Calculate mean of the three IES values
-        mean_ies = (ies1 + ies2 + ies3) / 3
-        
-        # Calculate AVEDEV (average deviation from mean)
-        # AVEDEV = (|IES1 - mean| + |IES2 - mean| + |IES3 - mean|) / 3
-        ave_dev = (abs(ies1 - mean_ies) + abs(ies2 - mean_ies) + abs(ies3 - mean_ies)) / 3
-        
-        # Convert to percentage of mean IES for better readability
-        # Lower AVEDEV means more consistent performance
-        focus_stability = round(100 * (1 - (ave_dev / mean_ies)))
-        
-        # Ensure stability is between 0 and 100
-        focus_stability = max(0, min(100, focus_stability))
-    except (ValueError, ZeroDivisionError):
-        # If any calculation fails, return 0
-        focus_drift = 0
-        focus_stability = 0
-    
-    return overall_ies, ies1, ies2, ies3, focus_drift, focus_stability
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
