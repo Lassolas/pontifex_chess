@@ -665,7 +665,11 @@ class GameUI {
             
             const data = await response.json();
             console.log('Parsed JSON data:', data);
-            
+
+            if (!data || !data.success || !data.leaderboard) {
+                throw new Error('Invalid leaderboard response payload');
+            }
+
             this.displayLeaderboard(data.leaderboard, highlightCurrentUser);
             
             // Clear loading text if element exists
@@ -682,6 +686,59 @@ class GameUI {
         }
     }
 
+    parseLeaderboardMetric(entry, key) {
+        const value = entry?.[key];
+        if (value === undefined || value === null || value === '') {
+            return null;
+        }
+
+        const parsed = parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    buildLeaderboardRowHTML(entry, fallbackRank) {
+        const ies = this.parseLeaderboardMetric(entry, 'score') ?? 0;
+        const driftThreshold = 0.2 * ies;
+
+        const drift = this.parseLeaderboardMetric(entry, 'drift');
+        const stability = this.parseLeaderboardMetric(entry, 'stability');
+
+        const driftColor = drift !== null
+            ? (drift > driftThreshold ? 'darkgreen' : drift >= -driftThreshold ? 'darkgoldenrod' : 'darkred')
+            : 'gray';
+        const stabilityColor = stability !== null
+            ? (stability >= 80 ? 'darkgreen' : stability >= 60 ? 'darkgoldenrod' : 'darkred')
+            : 'gray';
+
+        const driftDisplay = drift !== null ? (drift >= 0 ? `+${drift}` : `${drift}`) : 'N/A';
+        const stabilityDisplay = stability !== null ? `${stability}%` : 'N/A';
+        const rank = entry?.rank || fallbackRank;
+        const name = entry?.name || '';
+        const score = entry?.score || '';
+
+        return `
+            <td>${rank}</td>
+            <td>${name}</td>
+            <td>${score}</td>
+            <td style="color: ${driftColor}">${driftDisplay}</td>
+            <td style="color: ${stabilityColor}">${stabilityDisplay}</td>
+        `;
+    }
+
+    getLeaderboardEntriesForDifficulty(leaderboardData, difficulty) {
+        const keyVariants = [
+            difficulty.toLowerCase(),
+            difficulty.toUpperCase(),
+            difficulty.charAt(0).toUpperCase() + difficulty.slice(1)
+        ];
+
+        const entries = keyVariants
+            .map(key => leaderboardData[key])
+            .find(Array.isArray) || [];
+
+        return entries.slice().sort((a, b) => parseFloat(a.score) - parseFloat(b.score));
+    }
+
     displayLeaderboard(leaderboardData, highlightCurrentUser = false) {
         console.log('displayLeaderboard called with data:', leaderboardData);
         
@@ -691,148 +748,62 @@ class GameUI {
             return;
         }
 
-        // Clear existing content
         const leaderboardContainer = document.getElementById('leaderboard-container');
         if (!leaderboardContainer) {
             console.error('Leaderboard container not found');
             return;
         }
-        leaderboardContainer.innerHTML = '';
+        const tableBodies = {
+            easy: document.getElementById('leaderboard-easy'),
+            medium: document.getElementById('leaderboard-medium'),
+            hard: document.getElementById('leaderboard-hard')
+        };
 
-        // Create leaderboard columns
-        const difficulties = ['hard', 'medium', 'easy'];
-        difficulties.forEach(difficulty => {
-            const column = document.createElement('div');
-            column.className = 'leaderboard-column';
+        if (!tableBodies.easy || !tableBodies.medium || !tableBodies.hard) {
+            console.error('Leaderboard table bodies not found in DOM');
+            return;
+        }
 
-            // Add column header
-            const header = document.createElement('h3');
-            header.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-            column.appendChild(header);
+        Object.values(tableBodies).forEach(tbody => {
+            tbody.innerHTML = '';
+        });
 
-            // Add table
-            const table = document.createElement('table');
-            table.className = 'leaderboard-table';
+        ['easy', 'medium', 'hard'].forEach(difficulty => {
+            const tbody = tableBodies[difficulty];
+            const entries = this.getLeaderboardEntriesForDifficulty(leaderboardData, difficulty);
 
-            // Add table header
-            const thead = document.createElement('thead');
-            const headerRow = document.createElement('tr');
-            headerRow.innerHTML = `
-                <th>Rank</th>
-                <th>Name</th>
-                <th>IES (s)</th>
-                <th>Drift (s)</th>
-                <th>Stability (%)</th>
-            `;
-            thead.appendChild(headerRow);
-            table.appendChild(thead);
-
-            // Add table body
-            const tbody = document.createElement('tbody');
-
-            // Get entries for this difficulty - use case-insensitive comparison
-            const entries = (leaderboardData[difficulty.toLowerCase()] || 
-                            leaderboardData[difficulty.toUpperCase()] || 
-                            leaderboardData[difficulty.charAt(0).toUpperCase() + difficulty.slice(1)] || 
-                            [])
-                            .sort((a, b) => parseFloat(a.score) - parseFloat(b.score));
-            
-            // Add top 10 entries with highlighting for current user
             entries.slice(0, 10).forEach((entry, index) => {
                 const row = document.createElement('tr');
-                
-                // Highlight current user's row
                 if (highlightCurrentUser && entry.name === this.patientName) {
                     row.className = 'highlight-current-user';
                 }
-                
-                // Parse IES score as number
-                const IES = parseFloat(entry.score) || 0;
-                const driftThreshold = 0.2 * IES; // 20% of IES
 
-                // Parse drift and stability, handle undefined/null/empty values
-                const drift = entry.drift !== undefined && entry.drift !== null && entry.drift !== '' 
-                    ? parseFloat(entry.drift) : null;
-                const stability = entry.stability !== undefined && entry.stability !== null && entry.stability !== '' 
-                    ? parseFloat(entry.stability) : null;
-
-                // Determine colors for drift and stability
-                const driftColor = drift !== null 
-                    ? (drift > driftThreshold ? 'darkgreen' : drift >= -driftThreshold ? 'darkgoldenrod' : 'darkred')
-                    : 'gray';
-                const stabilityColor = stability !== null 
-                    ? (stability >= 80 ? 'darkgreen' : stability >= 60 ? 'darkgoldenrod' : 'darkred')
-                    : 'gray';
-                
-                // Format drift value with '+' for positive numbers
-                const driftDisplay = drift !== null 
-                    ? (drift >= 0 ? `+${drift}` : drift) 
-                    : 'N/A';
-                const stabilityDisplay = stability !== null ? `${stability}%` : 'N/A';
-                
-                row.innerHTML = `
-                    <td>${entry.rank || (index + 1)}</td>
-                    <td>${entry.name || ''}</td>
-                    <td>${entry.score || ''}</td>
-                    <td style="color: ${driftColor}">${driftDisplay}</td>
-                    <td style="color: ${stabilityColor}">${stabilityDisplay}</td>
-                `;
+                row.innerHTML = this.buildLeaderboardRowHTML(entry, index + 1);
                 tbody.appendChild(row);
             });
 
-            // If highlighting current user and they're beyond top 10
             if (highlightCurrentUser) {
                 const currentUserEntry = entries.find(entry => entry.name === this.patientName);
-                if (currentUserEntry && entries.indexOf(currentUserEntry) >= 10) {
+                const currentUserIndex = currentUserEntry ? entries.indexOf(currentUserEntry) : -1;
+
+                if (currentUserEntry && currentUserIndex >= 10) {
                     const separator = document.createElement('tr');
                     separator.className = 'leaderboard-separator';
-                    separator.innerHTML = `
-                        <td colspan="5">Your Score:</td>
-                    `;
+                    separator.innerHTML = '<td colspan="5">Your Score:</td>';
                     tbody.appendChild(separator);
 
                     const currentUserRow = document.createElement('tr');
                     currentUserRow.className = 'highlight-current-user';
-                    
-                    // Parse IES score as number
-                    const IES = parseFloat(currentUserEntry.score) || 0;
-                    const driftThreshold = 0.2 * IES; // 20% of IES
-
-                    // Parse drift and stability, handle undefined/null/empty values
-                    const drift = currentUserEntry.drift !== undefined && currentUserEntry.drift !== null && currentUserEntry.drift !== '' 
-                        ? parseFloat(currentUserEntry.drift) : null;
-                    const stability = currentUserEntry.stability !== undefined && currentUserEntry.stability !== null && currentUserEntry.stability !== '' 
-                        ? parseFloat(currentUserEntry.stability) : null;
-
-                    // Determine colors for drift and stability
-                    const driftColor = drift !== null 
-                        ? (drift > driftThreshold ? 'darkgreen' : drift >= -driftThreshold ? 'darkgoldenrod' : 'darkred')
-                        : 'gray';
-                    const stabilityColor = stability !== null 
-                        ? (stability >= 80 ? 'darkgreen' : stability >= 60 ? 'darkgoldenrod' : 'darkred')
-                        : 'gray';
-                    
-                    // Format drift value with '+' for positive numbers
-                    const driftDisplay = drift !== null 
-                        ? (drift >= 0 ? `+${drift}` : drift) 
-                        : 'N/A';
-                    const stabilityDisplay = stability !== null ? `${stability}%` : 'N/A';
-                    
-                    currentUserRow.innerHTML = `
-                        <td>${currentUserEntry.rank || (entries.indexOf(currentUserEntry) + 1)}</td>
-                        <td>${currentUserEntry.name || ''}</td>
-                        <td>${currentUserEntry.score || ''}</td>
-                        <td style="color: ${driftColor}">${driftDisplay}</td>
-                        <td style="color: ${stabilityColor}">${stabilityDisplay}</td>
-                    `;
+                    currentUserRow.innerHTML = this.buildLeaderboardRowHTML(currentUserEntry, currentUserIndex + 1);
                     tbody.appendChild(currentUserRow);
                 }
             }
-
-            table.appendChild(tbody);
-            column.appendChild(table);
-            leaderboardContainer.appendChild(column);
         });
+
+        const leaderboardTables = document.getElementById('leaderboard-tables');
+        if (leaderboardTables) {
+            leaderboardTables.style.display = 'block';
+        }
 
         // Hide loading text if element exists
         if (this.leaderboardLoading) {

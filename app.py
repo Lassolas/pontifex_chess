@@ -256,6 +256,12 @@ def update_leaderboard(service, current_user=None, current_difficulty=None, curr
         safe_log('error', f"Error updating leaderboard: {str(e)}")
         raise
 
+
+def get_sheet_title_case_insensitive(sheet_titles, target_title):
+    """Return the sheet title matching target_title, case-insensitively."""
+    target_lower = target_title.lower()
+    return next((title for title in sheet_titles if title.lower() == target_lower), None)
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -278,10 +284,19 @@ def get_leaderboard():
         # Create service
         service = get_sheets_service()
         
+        # Resolve leaderboard sheet name case-insensitively
+        spreadsheet = service.spreadsheets().get(spreadsheetId=SHEET_ID).execute()
+        sheet_titles = [s['properties']['title'] for s in spreadsheet['sheets']]
+        leaderboard_sheet_name = get_sheet_title_case_insensitive(sheet_titles, "Leaderboard")
+
+        if not leaderboard_sheet_name:
+            safe_log('warning', "Leaderboard sheet not found")
+            return jsonify({"success": True, "leaderboard": {"easy": [], "medium": [], "hard": []}})
+
         # Get leaderboard data
         result = service.spreadsheets().values().get(
             spreadsheetId=SHEET_ID,
-            range="Leaderboard!A1:O1000"
+            range=f"{leaderboard_sheet_name}!A1:O1000"
         ).execute()
         
         leaderboard_data = result.get('values', [])        
@@ -511,40 +526,44 @@ def format_leaderboard_data(leaderboard_data):
         'hard': []
     }
 
-    for i, row in enumerate(leaderboard_data[2:]):  # Skip first two header rows
+    for i, raw_row in enumerate(leaderboard_data[2:]):  # Skip first two header rows
         try:
-            # Skip header rows - new structure has 15 columns (5 per difficulty)
-            # Easy: 0-4, Medium: 5-9, Hard: 10-14
-            if len(row) >= 15 and row[0] != "Rank" and row[5] != "Rank" and row[10] != "Rank":
-                # Easy column (columns 0-4: Rank, Name, IES, Drift, Stability)
-                if len(row) > 1 and row[1] and row[1] != "Name":
-                    formatted_data['easy'].append({
-                        'rank': row[0],
-                        'name': row[1],
-                        'score': row[2] if len(row) > 2 else '',
-                        'drift': row[3] if len(row) > 3 else '',
-                        'stability': row[4] if len(row) > 4 else ''
-                    })
-                # Medium column (columns 5-9: Rank, Name, IES, Drift, Stability)
-                if len(row) > 6 and row[6] and row[6] != "Name":
-                    formatted_data['medium'].append({
-                        'rank': row[5],
-                        'name': row[6],
-                        'score': row[7] if len(row) > 7 else '',
-                        'drift': row[8] if len(row) > 8 else '',
-                        'stability': row[9] if len(row) > 9 else ''
-                    })
-                # Hard column (columns 10-14: Rank, Name, IES, Drift, Stability)
-                if len(row) > 11 and row[11] and row[11] != "Name":
-                    formatted_data['hard'].append({
-                        'rank': row[10],
-                        'name': row[11],
-                        'score': row[12] if len(row) > 12 else '',
-                        'drift': row[13] if len(row) > 13 else '',
-                        'stability': row[14] if len(row) > 14 else ''
-                    })
+            # Google Sheets can omit trailing empty cells; pad to expected 15 columns.
+            row = list(raw_row) + [""] * max(0, 15 - len(raw_row))
+
+            # Skip accidental repeated header row content.
+            if row[0] == "Rank" and row[5] == "Rank" and row[10] == "Rank":
+                continue
+
+            # Easy column (columns 0-4: Rank, Name, IES, Drift, Stability)
+            if row[1] and row[1] != "Name":
+                formatted_data['easy'].append({
+                    'rank': row[0],
+                    'name': row[1],
+                    'score': row[2],
+                    'drift': row[3],
+                    'stability': row[4]
+                })
+            # Medium column (columns 5-9: Rank, Name, IES, Drift, Stability)
+            if row[6] and row[6] != "Name":
+                formatted_data['medium'].append({
+                    'rank': row[5],
+                    'name': row[6],
+                    'score': row[7],
+                    'drift': row[8],
+                    'stability': row[9]
+                })
+            # Hard column (columns 10-14: Rank, Name, IES, Drift, Stability)
+            if row[11] and row[11] != "Name":
+                formatted_data['hard'].append({
+                    'rank': row[10],
+                    'name': row[11],
+                    'score': row[12],
+                    'drift': row[13],
+                    'stability': row[14]
+                })
         except (IndexError, ValueError) as e:
-            safe_log('warning', f"Skipping invalid leaderboard row {i+1}: {row}, error: {str(e)}")
+            safe_log('warning', f"Skipping invalid leaderboard row {i+1}: {raw_row}, error: {str(e)}")
     
     safe_log('info', f"Formatted leaderboard entries - Easy: {len(formatted_data['easy'])}, Medium: {len(formatted_data['medium'])}, Hard: {len(formatted_data['hard'])}")
     return formatted_data
